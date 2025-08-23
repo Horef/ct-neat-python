@@ -7,9 +7,9 @@ from neat.activations import sigmoid_activation
 from ctrnn_visualize import draw_ctrnn_net, draw_ctrnn_dynamics, draw_ctrnn_face_portrait
 
 # Create a fully-connected network of two neurons with no external inputs.
-node1_inputs = [(1, 0.9), (2, 0.2), (3, -0.2)]
-node2_inputs = [(1, -0.2), (2, 0.9), (3, 0.1)]
-node3_inputs = [(1, 0.1), (2, -0.1), (3, 0.9)]
+node1_inputs = [(1, -0.1), (2, 0.2), (3, -0.2)]
+node2_inputs = [(1, 0.5), (2, 0.2), (3, 0.1)]
+node3_inputs = [(2, -0.1), (3, -0.5)]
 
 draw_ctrnn_net([1, 2, 3], {1: node1_inputs, 2: node2_inputs, 3: node3_inputs})
 
