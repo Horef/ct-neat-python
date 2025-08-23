@@ -7,7 +7,7 @@
 NEAT (NeuroEvolution of Augmenting Topologies) is a method developed by Kenneth O. Stanley for evolving arbitrary neural
 networks. Later NEAT was extended to evolve CT (Continuous Time) networks in different frameworks.
 This project is a Python implementation of CT-NEAT (and has both pure NEAT and CT-NEAT implementations) with few dependencies beyond the standard library (like scikit-learn). It was
-forked from the excellent project started by @MattKallada and continued by @CodeReclaimers (![neat-python](https://github.com/CodeReclaimers/neat-python?tab=readme-ov-file)) after their project was archived.
+forked from the excellent project started by @MattKallada and continued by @CodeReclaimers ([neat-python](https://github.com/CodeReclaimers/neat-python?tab=readme-ov-file)) after their project was archived.
 
 For further information regarding general concepts and theory, please see the 
 [Selected Publications](http://www.cs.ucf.edu/~kstanley/#publications) on Stanley's page at the University of Central 
