@@ -26,17 +26,20 @@ class CTRNNNodeEval(object):
 
 class CTRNN(object):
     """Sets up the ctrnn network itself."""
-    def __init__(self, inputs: List[int], outputs: List[int], node_evals: Dict[int, CTRNNNodeEval]):
+    def __init__(self, inputs: List[int], outputs: List[int], node_evals: Dict[int, CTRNNNodeEval], 
+                 custom_advance: Optional[Callable] = None):
         """
         Initialize the CTRNN with the given input and output nodes, and node evaluations.
         Args:
             inputs: The input node IDs.
             outputs: The output node IDs.
             node_evals: A dictionary mapping node IDs to their evaluations (CTRNNNodeEval objects).
+            custom_advance: An optional custom advance function.
         """
         self.input_nodes = inputs
         self.output_nodes = outputs
         self.node_evals = node_evals
+        self.custom_advance = custom_advance
 
         self.values = [{}, {}]
         for v in self.values:
@@ -79,6 +82,21 @@ class CTRNN(object):
         raise NotImplementedError()
 
     def advance(self, inputs: List[float], advance_time: float, time_step: Optional[float] = None):
+        """
+        Advance the simulation by the given amount of time, assuming that inputs are
+        constant at the given values during the simulated time.
+        Args:
+            inputs: The input values to the network.
+            advance_time: The amount of time to advance the simulation.
+            time_step: The time step to use for the simulation.
+        Returns:
+            The output values of the network after the simulation.
+        """
+        if self.custom_advance is not None:
+            return self.custom_advance(inputs, advance_time, time_step)
+        return self._simple_advance(inputs, advance_time, time_step)
+
+    def _simple_advance(self, inputs: List[float], advance_time: float, time_step: Optional[float] = None):
         """
         Advance the simulation by the given amount of time, assuming that inputs are
         constant at the given values during the simulated time.
