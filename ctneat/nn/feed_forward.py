@@ -2,31 +2,54 @@ from ctneat.graphs import feed_forward_layers
 
 
 class FeedForwardNetwork(object):
+    """Implements a simple feed-forward neural network."""
     def __init__(self, inputs, outputs, node_evals):
+        """
+        Initialize the feed-forward network.
+        Args:
+            inputs: List of input node IDs.
+            outputs: List of output node IDs.
+            node_evals: List of tuples (node_id, activation_function, aggregation_function, bias, response, links)
+                        where links is a list of (input_node_id, weight) tuples.
+        """
         self.input_nodes = inputs
         self.output_nodes = outputs
         self.node_evals = node_evals
+        # All nodes start with a value of 0.0
         self.values = dict((key, 0.0) for key in inputs + outputs)
 
     def activate(self, inputs):
+        """
+        Do a single pass over the network given the inputs.
+        Args:
+            inputs: List of input values in the same order as input_nodes.
+        Returns: 
+            List of output values.
+        """
         if len(self.input_nodes) != len(inputs):
             raise RuntimeError("Expected {0:n} inputs, got {1:n}".format(len(self.input_nodes), len(inputs)))
 
+        # For each input node, set the value to the given input
         for k, v in zip(self.input_nodes, inputs):
             self.values[k] = v
 
+        # For each node, compute its value based on its inputs
         for node, act_func, agg_func, bias, response, links in self.node_evals:
+            # Aggregation is done in a simple manner: weighted sum of inputs
             node_inputs = []
             for i, w in links:
                 node_inputs.append(self.values[i] * w)
             s = agg_func(node_inputs)
             self.values[node] = act_func(bias + response * s)
 
+        # Return the values of the output nodes
         return [self.values[i] for i in self.output_nodes]
 
     @staticmethod
     def create(genome, config):
-        """ Receives a genome and returns its phenotype (a FeedForwardNetwork). """
+        """ 
+        Receives a genome and returns its phenotype (a FeedForwardNetwork).
+        """
 
         # Gather expressed connections.
         connections = [cg.key for cg in genome.connections.values() if cg.enabled]

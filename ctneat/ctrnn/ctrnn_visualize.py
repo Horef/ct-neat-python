@@ -8,13 +8,14 @@ import graphviz
 from sklearn.decomposition import PCA
 from typing import Optional
 
-def draw_ctrnn_net(node_list: list, node_inputs: dict, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
+def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = False, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
     This function draws the CTRNN network structure.
     Args:
         node_list: A list of node IDs in the network.
         node_inputs: A dictionary where keys are node IDs and values are lists of input connections for each node.
         (I.e. each list contains tuples of (input_node_id, weight) for the node with the corresponding ID)
+        iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         dir_name: Optional directory name to save the output file. If None, saves in the current directory.
         file_name: Optional file name to save the output file. If None, defaults to 'ctrnn_network'.
     Returns:
@@ -32,12 +33,13 @@ def draw_ctrnn_net(node_list: list, node_inputs: dict, dir_name: Optional[str] =
 
     dot.render(file_name or 'ctrnn_network', format='png', cleanup=True, directory=dir_name or '.')
 
-def draw_ctrnn_dynamics(states: np.ndarray, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
+def draw_ctrnn_dynamics(states: np.ndarray, iznn: Optional[bool] = False, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
     This function draws the dynamics of the CTRNN over time.
     Args:
         states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
         and each column corresponds to a specific node's state.
+        iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         save: Whether to save the plot as a file. If False, the plot is shown interactively.
         show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.
         dir_name: Optional directory name to save the output file. If None, saves in the current directory.
@@ -47,7 +49,7 @@ def draw_ctrnn_dynamics(states: np.ndarray, save: bool = False, show: bool = Tru
     """
 
     plt.figure()
-    plt.title("CTRNN Dynamics")
+    plt.title(f"{'IZNN' if iznn else 'CTRNN'} Dynamics")
     plt.xlabel("Time")
     plt.ylabel("Output")
     plt.grid()
@@ -61,14 +63,15 @@ def draw_ctrnn_dynamics(states: np.ndarray, save: bool = False, show: bool = Tru
     if show:
         plt.show()
 
-def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
+def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2, iznn: Optional[bool] = False, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
     This function draws a face portrait of the CTRNN's state space.
     If there are more than 'n_components' nodes, the PCA is used to reduce the dimensionality to 'n_components'.
     Args:
-        states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
-        and each column corresponds to a specific node's state.
+        states: A 2D numpy array where each column corresponds to the state of the network at a given time step,
+        and each row corresponds to a specific node's state.
         n_components: The number of components to reduce to (default is 2, max is 3).
+        iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         save: Whether to save the plot as a file. If False, the plot is shown interactively.
         show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.
         dir_name: Optional directory name to save the output file. If None, saves in the current directory.
@@ -89,33 +92,42 @@ def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2, save: bo
 
     if n_components == 1:
         plt.figure(figsize=(10,5))
+        plt.title(f"{'IZNN' if iznn else 'CTRNN'} Face Portrait ({n_components}D)")
         plt.xlabel("Time")
         plt.ylabel("Principal Component 1")
         plt.grid()
 
-        plt.scatter(range(reduced_states.shape[0]), reduced_states[:, 0], color='b', s=5)
+        plt.plot(range(reduced_states.shape[0]), reduced_states[0], color='b', marker='o', markersize=3)
+        # denoting the start and end points
+        plt.text(range(reduced_states.shape[0])[0], reduced_states[0][0], 'Start', fontsize=12, color='green')
+        plt.text(range(reduced_states.shape[0])[-1], reduced_states[0][-1], 'End', fontsize=12, color='red')
 
     elif n_components == 2:
         plt.figure(figsize=(10,10))
-        plt.title("CTRNN Face Portrait")
+        plt.title(f"{'IZNN' if iznn else 'CTRNN'} Face Portrait ({n_components}D)")
         plt.xlabel("Principal Component 1")
         plt.ylabel("Principal Component 2")
         plt.grid()
 
-        for i in range(reduced_states.shape[0]):
-            plt.scatter(reduced_states[i, 0], reduced_states[i, 1], color='b', s=5)
+        plt.plot(reduced_states[0], reduced_states[1], color='b', marker='o', markersize=3)
+        # denoting the start and end points
+        plt.text(reduced_states[0][0], reduced_states[1][0], 'Start', fontsize=12, color='green')
+        plt.text(reduced_states[0][-1], reduced_states[1][-1], 'End', fontsize=12, color='red')
 
     elif n_components == 3:
         plt.figure(figsize=(10,10))
         ax = plt.axes(projection='3d')
         ax.grid()
 
-        ax.set_title("CTRNN Face Portrait")
+        ax.set_title(f"{'IZNN' if iznn else 'CTRNN'} Face Portrait ({n_components}D)")
         ax.set_xlabel("Principal Component 1")
         ax.set_ylabel("Principal Component 2")
         ax.set_zlabel("Principal Component 3")
 
-        ax.plot3D(reduced_states[:, 0], reduced_states[:, 1], reduced_states[:, 2], color='b')
+        ax.plot3D(reduced_states[0], reduced_states[1], reduced_states[2], color='b', marker='o', markersize=3)
+        # denoting the start and end points
+        ax.text(reduced_states[0][0], reduced_states[1][0], reduced_states[2][0], 'Start', fontsize=12, color='green')
+        ax.text(reduced_states[0][-1], reduced_states[1][-1], reduced_states[2][-1], 'End', fontsize=12, color='red')
 
     if save:
         plt.savefig(f"{dir_name + '/' if dir_name else ''}{file_name or 'ctrnn_face_portrait'}.png")

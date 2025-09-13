@@ -1,4 +1,4 @@
-from typing import Tuple, List, Dict, Callable, Optional
+from typing import Tuple, List, Dict, Callable, Optional, Union
 """
 This module implements a spiking neural network.
 Neurons are based on the model described by:
@@ -84,7 +84,9 @@ class IZNeuron(object):
         # Membrane recovery variable.
         self.u = self.b * self.v
 
+        # 1.0 if the neuron has fired, 0.0 otherwise.
         self.fired = 0.0
+        # Input current (milliamps).
         self.current = self.bias
 
     def advance(self, dt_msec: float):
@@ -100,7 +102,7 @@ class IZNeuron(object):
         Args:
             dt_msec (float): The time step in milliseconds.
         """
-        # TODO: Make the time step adjustable, and choose an appropriate
+        # TODO: Choose an appropriate
         # numerical integration method to maintain stability.
         # TODO: The need to catch overflows indicates that the current method is
         # not stable for all possible network configurations and states.
@@ -143,6 +145,7 @@ class IZNN(object):
         self.inputs = inputs
         self.outputs = outputs
         self.input_values = {}
+        self.time_ms = 0.0
 
     def set_inputs(self, inputs: List[float]):
         """
@@ -155,6 +158,7 @@ class IZNN(object):
             raise RuntimeError(
                 "Number of inputs {0:d} does not match number of input nodes {1:d}".format(
                     len(inputs), len(self.inputs)))
+        # Set the input values for the input neurons (in the same order as input_nodes).
         for i, v in zip(self.inputs, inputs):
             self.input_values[i] = v
 
@@ -162,6 +166,7 @@ class IZNN(object):
         """Resets all neurons to their default state."""
         for n in self.neurons.values():
             n.reset()
+        self.time_ms = 0.0
 
     def get_time_step_msec(self):
         # pylint: disable=no-self-use
@@ -169,9 +174,31 @@ class IZNN(object):
         # result from using this hard-coded time step.
         return 0.05
 
-    def advance(self, dt_msec):
+    def advance(self, dt_msec, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
+        """
+        Advances the simulation by the given time step in milliseconds.
+        Args:
+            dt_msec (float): The time step in milliseconds.
+            ret (list(str) or str or None): Specifies what to return.
+                If a list of strings, returns a list of lists, where each inner list corresponds to
+                the requested attribute for all output neurons.
+                If a single string, returns a list corresponding to the requested attribute for all output neurons.
+                If None, returns a list of firing states for all output neurons.
+                Valid strings are:
+                    'fired' - returns the firing states (1.0 if fired, 0.0 otherwise)
+                    'voltages' - returns the membrane potentials (in millivolts)
+                    'recovery' - returns the recovery variables
+                    'all' - returns a list of lists: [fired states, voltages, recovery variables]
+        Returns:
+            A list or a list of lists as specified by the 'ret' parameter.
+        """
+
         for n in self.neurons.values():
             n.current = n.bias
+            # In the advance step, we compute the new current for each neuron.
+            # Each input contributes its value * weight to the current.
+            # Where value is 1.0 if the input neuron fired, and 0.0 otherwise.
+            # In case the input is not a neuron, we use the externally set input value.
             for i, w in n.inputs:
                 ineuron = self.neurons.get(i)
                 if ineuron is not None:
@@ -183,8 +210,20 @@ class IZNN(object):
 
         for n in self.neurons.values():
             n.advance(dt_msec)
+        self.time_ms += dt_msec
 
-        return [self.neurons[i].fired for i in self.outputs]
+        out_neurons_firing = [self.neurons[i].fired for i in self.outputs]
+        out_neurons_voltages = [self.neurons[i].v for i in self.outputs]
+        out_neurons_recovery = [self.neurons[i].u for i in self.outputs]
+        ret_keys = {'fired': out_neurons_firing, 'voltages': out_neurons_voltages, 'recovery': out_neurons_recovery}
+        if isinstance(ret, list):
+            return [ret_keys[k] for k in ret if k in ret_keys]
+        elif isinstance(ret, str):
+            if ret == 'all':
+                return [out_neurons_firing, out_neurons_voltages, out_neurons_recovery]
+            return ret_keys.get(ret, [])
+        else:
+            return out_neurons_firing
 
     @staticmethod
     def create(genome, config):

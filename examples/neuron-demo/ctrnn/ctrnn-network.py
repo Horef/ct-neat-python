@@ -3,14 +3,14 @@ import numpy as np
 import os
 import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
 import ctneat
 from ctneat.activations import sigmoid_activation
 
 from ctneat.ctrnn.ctrnn_visualize import draw_ctrnn_net, draw_ctrnn_dynamics, draw_ctrnn_face_portrait
 
-# Create a fully-connected network of two neurons with no external inputs.
+# Create a fully-connected network of a few neurons with no external inputs.
 node1_inputs = [(1, -0.1), (2, 0.2), (3, -0.2)]
 node2_inputs = [(1, 0.5), (2, 0.2), (3, 0.1)]
 node3_inputs = [(2, -0.1), (3, -0.5)]

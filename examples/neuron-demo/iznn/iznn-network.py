@@ -1,83 +1,43 @@
 import matplotlib.pyplot as plt
-
+import numpy as np
 import os
 import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
 import ctneat
+from ctneat.ctrnn.ctrnn_visualize import draw_ctrnn_net, draw_ctrnn_dynamics, draw_ctrnn_face_portrait
 
 
-def plot_spikes(spikes, title):
-    """ Plots the trains for a single spiking neuron. """
-    t_values = [t for t, I, v, u, f in spikes]
-    v_values = [v for t, I, v, u, f in spikes]
-    u_values = [u for t, I, v, u, f in spikes]
-    I_values = [I for t, I, v, u, f in spikes]
-    f_values = [f for t, I, v, u, f in spikes]
+# Create a fully-connected network of a few neurons with no external inputs.
+node1_inputs = [(0, 0.5) ,(1, 0.9), (2, 0.5)]
+node2_inputs = [(0, -0.2), (1, -0.2), (2, 0.8)]
 
-    fig = plt.figure()
-    plt.subplot(4, 1, 1)
-    plt.ylabel("Potential (mv)")
-    plt.xlabel("Time (in ms)")
-    plt.grid()
-    plt.plot(t_values, v_values, "g-")
+draw_ctrnn_net([0, 1, 2], {1: node1_inputs, 2: node2_inputs}, iznn=True, file_name='iznn-net')
 
-    plt.title("Izhikevich's spiking neuron model ({0!s})".format(title))
+n1 = ctneat.iznn.IZNeuron(bias=0.0, **ctneat.iznn.FAST_SPIKING_PARAMS, inputs=node1_inputs)
+n2 = ctneat.iznn.IZNeuron(bias=0.0, **ctneat.iznn.LOW_THRESHOLD_SPIKING_PARAMS, inputs=node2_inputs)
 
-    plt.subplot(4, 1, 2)
-    plt.ylabel("Fired")
-    plt.xlabel("Time (in ms)")
-    plt.grid()
-    plt.plot(t_values, f_values, "r-")
+iznn_nodes = {1: n1, 2: n2}
 
-    plt.subplot(4, 1, 3)
-    plt.ylabel("Recovery (u)")
-    plt.xlabel("Time (in ms)")
-    plt.grid()
-    plt.plot(t_values, u_values, "r-")
+net = ctneat.iznn.IZNN(iznn_nodes, [0], [1, 2])
 
-    plt.subplot(4, 1, 4)
-    plt.ylabel("Current (I)")
-    plt.xlabel("Time (in ms)")
-    plt.grid()
-    plt.plot(t_values, I_values, "r-o")
+init0 = 1000
 
-    fig = plt.figure()
-    plt.title("Izhikevich's spiking neuron model u/v ({0!s})".format(title))
-    plt.xlabel("Recovery (u)")
-    plt.ylabel("Potential (mv)")
-    plt.grid()
-    plt.plot(u_values, v_values, 'r-')
+net.set_inputs([init0])
 
-    plt.show()
-    plt.close()
+times = [0.0]
+outputs = [[n1.fired, n2.fired]]
+for i in range(20):
+    output = net.advance(0.02, ret='voltages')
+    times.append(net.time_ms)
+    outputs.append(output)
+    
+    # printout = ["{0:.7f}".format(o) for o in output]
+    # print(" ".join(printout))
 
+outputs = np.array(outputs).T
 
-def show(title, a, b, c, d):
-    n = ctneat.iznn.IZNeuron(0.0, a, b, c, d, [])
-    spike_train = []
-    for i in range(1000):
-        n.current = 0.0 if i < 100 or i > 800 else 10.0
-        spike_train.append((1.0 * i, n.current, n.v, n.u, n.fired))
-        print('{0:d}\t{1:f}\t{2:f}\t{3:f}'.format(i, n.current, n.v, n.u))
-        n.advance(0.25)
+draw_ctrnn_dynamics(outputs, iznn=True, save=True, show=False, dir_name='.', file_name='iznn-dynamics')
 
-    plot_spikes(spike_train, title)
-
-
-show('regular spiking', **ctneat.iznn.REGULAR_SPIKING_PARAMS)
-
-show('intrinsically bursting', **ctneat.iznn.INTRINSICALLY_BURSTING_PARAMS)
-
-show('chattering', **ctneat.iznn.CHATTERING_PARAMS)
-
-show('fast spiking', **ctneat.iznn.FAST_SPIKING_PARAMS)
-
-show('low-threshold spiking', **ctneat.iznn.LOW_THRESHOLD_SPIKING_PARAMS)
-
-show('thalamo-cortical', 0.02, 0.25, -65.0, 0.05)
-
-show('resonator', 0.1, 0.26, -65.0, 2.0)
-
-plt.show()
+draw_ctrnn_face_portrait(outputs, n_components=2, iznn=True, save=True, show=False, dir_name='.', file_name='iznn-face-portrait')
