@@ -37,8 +37,8 @@ def draw_ctrnn_dynamics(states: np.ndarray, iznn: Optional[bool] = False, save: 
     """
     This function draws the dynamics of the CTRNN over time.
     Args:
-        states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
-        and each column corresponds to a specific node's state.
+        states: A 2D numpy array where each column corresponds to the state of the network at a given time step,
+        and each row corresponds to a specific node's state.
         iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         save: Whether to save the plot as a file. If False, the plot is shown interactively.
         show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.
