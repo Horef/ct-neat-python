@@ -7,12 +7,12 @@ import matplotlib.pyplot as plt
 from PySpice.Spice.Library import SpiceLibrary
 from PySpice.Spice.Netlist import Circuit
 
-import neat
-from neat.activations import ActivationFunctionSet
-from neat.attributes import FloatAttribute, BoolAttribute, StringAttribute
-from neat.config import ConfigParameter, write_pretty_params
-from neat.genes import BaseGene
-from neat.six_util import iteritems, iterkeys
+import ctneat
+from ctneat.activations import ActivationFunctionSet
+from ctneat.attributes import FloatAttribute, BoolAttribute, StringAttribute
+from ctneat.config import ConfigParameter, write_pretty_params
+from ctneat.genes import BaseGene
+from ctneat.six_util import iteritems, iterkeys
 
 import visualize
 
@@ -387,21 +387,21 @@ def eval_genomes(genomes, config):
 
 def run(config_file):
     # Load configuration.
-    config = neat.Config(CircuitGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(CircuitGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_file)
     #config.save('test_save_config.txt')
 
     # Create the population, which is the top-level object for a NEAT run.
-    p = neat.Population(config)
+    p = ctneat.Population(config)
 
     # Add a stdout reporter to show progress in the terminal.
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
+    p.add_reporter(ctneat.StdOutReporter(True))
+    stats = ctneat.StatisticsReporter()
     p.add_reporter(stats)
 
     # Run for up to 1000 generations.
-    pe = neat.ParallelEvaluator(4, simulate)
+    pe = ctneat.ParallelEvaluator(4, simulate)
     p.run(pe.evaluate, 1000)
 
     # Write run statistics to file.

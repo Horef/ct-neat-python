@@ -8,7 +8,7 @@ import warnings
 from functools import reduce
 from operator import mul
 
-from neat.math_util import mean, median2
+from ctneat.math_util import mean, median2
 
 
 def product_aggregation(x):  # note: `x` is a list or other iterable

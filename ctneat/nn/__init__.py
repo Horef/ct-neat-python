@@ -1,2 +1,2 @@
-from neat.nn.feed_forward import FeedForwardNetwork
-from neat.nn.recurrent import RecurrentNetwork
+from ctneat.nn.feed_forward import FeedForwardNetwork
+from ctneat.nn.recurrent import RecurrentNetwork

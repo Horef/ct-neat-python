@@ -7,8 +7,8 @@ import math
 import random
 from itertools import count
 
-from neat.config import ConfigParameter, DefaultClassConfig
-from neat.math_util import mean
+from ctneat.config import ConfigParameter, DefaultClassConfig
+from ctneat.math_util import mean
 
 
 # TODO: Provide some sort of optional cross-species performance criteria, which

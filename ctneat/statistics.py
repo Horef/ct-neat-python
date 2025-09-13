@@ -5,8 +5,8 @@ the most-fit genomes and information on genome/species fitness and species sizes
 import copy
 import csv
 
-from neat.math_util import mean, stdev, median2
-from neat.reporting import BaseReporter
+from ctneat.math_util import mean, stdev, median2
+from ctneat.reporting import BaseReporter
 
 
 # TODO: Make a version of this reporter that doesn't continually increase memory usage.

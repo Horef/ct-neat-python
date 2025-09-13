@@ -1,3 +1,4 @@
+from typing import Tuple, List, Dict, Callable, Optional
 """
 This module implements a spiking neural network.
 Neurons are based on the model described by:
@@ -9,10 +10,10 @@ IEEE TRANSACTIONS ON NEURAL NETWORKS, VOL. 14, NO. 6, NOVEMBER 2003
 http://www.izhikevich.org/publications/spikes.pdf
 """
 
-from neat.attributes import FloatAttribute
-from neat.genes import BaseGene, DefaultConnectionGene
-from neat.genome import DefaultGenomeConfig, DefaultGenome
-from neat.graphs import required_for_output
+from ctneat.attributes import FloatAttribute
+from ctneat.genes import BaseGene, DefaultConnectionGene
+from ctneat.genome import DefaultGenomeConfig, DefaultGenome
+from ctneat.graphs import required_for_output
 
 # a, b, c, d are the parameters of the Izhikevich model.
 # a: the time scale of the recovery variable
@@ -58,17 +59,17 @@ class IZGenome(DefaultGenome):
 
 class IZNeuron(object):
     """Sets up and simulates the iznn nodes (neurons)."""
-    def __init__(self, bias, a, b, c, d, inputs):
+    def __init__(self, bias: float, a: float, b: float, c: float, d: float, inputs: List[Tuple[int, float]]):
         """
         a, b, c, d are the parameters of the Izhikevich model.
 
-        :param float bias: The bias of the neuron.
-        :param float a: The time-scale of the recovery variable.
-        :param float b: The sensitivity of the recovery variable.
-        :param float c: The after-spike reset value of the membrane potential.
-        :param float d: The after-spike reset value of the recovery variable.
-        :param inputs: A list of (input key, weight) pairs for incoming connections.
-        :type inputs: list(tuple(int, float))
+        Args:
+            bias (float): The bias of the neuron.
+            a (float): The time-scale of the recovery variable.
+            b (float): The sensitivity of the recovery variable.
+            c (float): The after-spike reset value of the membrane potential.
+            d (float): The after-spike reset value of the recovery variable.
+            inputs (list(tuple(int, float))): A list of (input key, weight) pairs for incoming connections.
         """
         self.a = a
         self.b = b
@@ -86,7 +87,7 @@ class IZNeuron(object):
         self.fired = 0.0
         self.current = self.bias
 
-    def advance(self, dt_msec):
+    def advance(self, dt_msec: float):
         """
         Advances simulation time by the given time step in milliseconds.
 
@@ -95,6 +96,9 @@ class IZNeuron(object):
 
         if v >= 30 then
             v <- c, u <- u + d
+        
+        Args:
+            dt_msec (float): The time step in milliseconds.
         """
         # TODO: Make the time step adjustable, and choose an appropriate
         # numerical integration method to maintain stability.
@@ -126,14 +130,27 @@ class IZNeuron(object):
 
 class IZNN(object):
     """Basic iznn network object."""
-    def __init__(self, neurons, inputs, outputs):
+    def __init__(self, neurons: Dict[int, IZNeuron], inputs: List[int], outputs: List[int]):
+        """
+        Initializes the IZNN with the given neurons, inputs, and outputs.
+
+        Args:
+            neurons (dict): A dictionary mapping neuron IDs to IZNeuron instances.
+            inputs (list): A list of input neuron IDs.
+            outputs (list): A list of output neuron IDs.
+        """
         self.neurons = neurons
         self.inputs = inputs
         self.outputs = outputs
         self.input_values = {}
 
-    def set_inputs(self, inputs):
-        """Assign input voltages."""
+    def set_inputs(self, inputs: List[float]):
+        """
+        Assigns input voltages.
+
+        Args:
+            inputs (list): A list of input voltages. (in millivolts, where each voltage corresponds to an input neuron)
+        """
         if len(inputs) != len(self.inputs):
             raise RuntimeError(
                 "Number of inputs {0:d} does not match number of input nodes {1:d}".format(
@@ -142,7 +159,7 @@ class IZNN(object):
             self.input_values[i] = v
 
     def reset(self):
-        """Reset all neurons to their default state."""
+        """Resets all neurons to their default state."""
         for n in self.neurons.values():
             n.reset()
 

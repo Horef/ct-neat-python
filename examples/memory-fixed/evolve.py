@@ -10,7 +10,7 @@ import math
 import os
 import random
 
-import neat
+import ctneat
 import visualize
 
 
@@ -39,7 +39,7 @@ num_tests = 2 ** (N + 2)
 
 
 def eval_genome(genome, config):
-    net = neat.nn.RecurrentNetwork.create(genome, config)
+    net = ctneat.nn.RecurrentNetwork.create(genome, config)
 
     error = 0.0
     for _ in range(num_tests):
@@ -70,8 +70,8 @@ def run():
     # Determine path to configuration file.
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'config')
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_path)
 
     # Demonstration of saving a configuration back to a text file.
@@ -87,10 +87,10 @@ def run():
     # config file aggregation_options option under the DefaultGenome section.
     config.genome_config.add_aggregation('my_l2norm_function', l2norm)
 
-    pop = neat.Population(config)
-    stats = neat.StatisticsReporter()
+    pop = ctneat.Population(config)
+    stats = ctneat.StatisticsReporter()
     pop.add_reporter(stats)
-    pop.add_reporter(neat.StdOutReporter(True))
+    pop.add_reporter(ctneat.StdOutReporter(True))
 
     winner = pop.run(eval_genomes, 200)
 
@@ -100,7 +100,7 @@ def run():
     # Show output of the most fit genome against a random input.
     print('\nBest genome:\n{!s}'.format(winner))
     print('\nOutput:')
-    winner_net = neat.nn.RecurrentNetwork.create(winner, config)
+    winner_net = ctneat.nn.RecurrentNetwork.create(winner, config)
     num_correct = 0
     for n in range(num_tests):
         print('\nRun {0} output:'.format(n))

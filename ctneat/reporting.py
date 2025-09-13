@@ -5,7 +5,7 @@ are generally intended to  provide information to the user, store checkpoints, e
 
 import time
 
-from neat.math_util import mean, stdev
+from ctneat.math_util import mean, stdev
 
 
 class ReporterSet(object):

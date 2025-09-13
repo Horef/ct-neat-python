@@ -1,4 +1,4 @@
-from neat.graphs import feed_forward_layers
+from ctneat.graphs import feed_forward_layers
 
 
 class FeedForwardNetwork(object):

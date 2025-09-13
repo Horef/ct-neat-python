@@ -6,8 +6,8 @@ import sys
 import time
 import unittest
 
-import neat
-from neat.distributed import MODE_PRIMARY, MODE_SECONDARY
+import ctneat
+from ctneat.distributed import MODE_PRIMARY, MODE_SECONDARY
 
 ON_PYPY = platform.python_implementation().upper().startswith("PYPY")
 
@@ -18,7 +18,7 @@ XOR_OUTPUTS = [(0.0,), (1.0,), (1.0,), (0.0,)]
 
 def eval_genome_distributed(genome, config):
     fitness = 1.0
-    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    net = ctneat.nn.FeedForwardNetwork.create(genome, config)
     for xi, xo in zip(XOR_INPUTS, XOR_OUTPUTS):
         output = net.activate(xi)
         fitness -= (output[0] - xo[0]) ** 2
@@ -33,23 +33,23 @@ def run_primary(addr, authkey, generations):
     config_path = os.path.join(local_dir, 'test_configuration2')
 
     # Load configuration.
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_path)
 
     # Create the population, which is the top-level object for a NEAT run.
-    p = neat.Population(config)
+    p = ctneat.Population(config)
 
     # Add a stdout reporter to show progress in the terminal.
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
+    p.add_reporter(ctneat.StdOutReporter(True))
+    stats = ctneat.StatisticsReporter()
     p.add_reporter(stats)
-    checkpointer = neat.Checkpointer(max(1, int(generations / 4)), 10)
+    checkpointer = ctneat.Checkpointer(max(1, int(generations / 4)), 10)
     p.add_reporter(checkpointer)
 
     # Run for the specified number of generations.
     winner = None
-    de = neat.DistributedEvaluator(
+    de = ctneat.DistributedEvaluator(
         addr,
         authkey=authkey,
         eval_function=eval_genome_distributed,
@@ -67,7 +67,7 @@ def run_primary(addr, authkey, generations):
 
         # Show output of the most fit genome against training data.
         print('\nOutput:')
-        winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
+        winner_net = ctneat.nn.FeedForwardNetwork.create(winner, config)
         for xi, xo in zip(XOR_INPUTS, XOR_OUTPUTS):
             output = winner_net.activate(xi)
             print("input {!r}, expected output {!r}, got {!r}".format(xi, xo, output))
@@ -75,9 +75,9 @@ def run_primary(addr, authkey, generations):
     if (checkpointer.last_generation_checkpoint >= 0) and (checkpointer.last_generation_checkpoint < 100):
         filename = 'neat-checkpoint-{0}'.format(checkpointer.last_generation_checkpoint)
         print("Restoring from {!s}".format(filename))
-        p2 = neat.checkpoint.Checkpointer.restore_checkpoint(filename)
-        p2.add_reporter(neat.StdOutReporter(True))
-        stats2 = neat.StatisticsReporter()
+        p2 = ctneat.checkpoint.Checkpointer.restore_checkpoint(filename)
+        p2.add_reporter(ctneat.StdOutReporter(True))
+        stats2 = ctneat.StatisticsReporter()
         p2.add_reporter(stats2)
 
         winner2 = None
@@ -102,20 +102,20 @@ def run_secondary(addr, authkey, num_workers=1):
     config_path = os.path.join(local_dir, 'test_configuration2')
 
     # Load configuration.
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_path)
 
     # Create the population, which is the top-level object for a NEAT run.
-    p = neat.Population(config)
+    p = ctneat.Population(config)
 
     # Add a stdout reporter to show progress in the terminal.
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
+    p.add_reporter(ctneat.StdOutReporter(True))
+    stats = ctneat.StatisticsReporter()
     p.add_reporter(stats)
 
     # Run for the specified number of generations.
-    de = neat.DistributedEvaluator(
+    de = ctneat.DistributedEvaluator(
         addr,
         authkey=authkey,
         eval_function=eval_genome_distributed,

@@ -1,4 +1,4 @@
-import neat
+import ctneat
 
 
 # TODO: These tests are just smoke tests to make sure nothing has become badly broken.  Expand
@@ -25,7 +25,7 @@ def test_softmax():
                                                         0.17468129859572226])]
 
     for test in test_data:
-        results_list = list(neat.math_util.softmax(test[0]))
+        results_list = list(ctneat.math_util.softmax(test[0]))
         for a, b in zip(test[1], results_list):
             assert_almost_equal(a, b)
 

@@ -1,7 +1,7 @@
 from typing import Callable, List, Tuple, Dict, Optional
 
 """Handles the continuous-time recurrent neural network implementation."""
-from neat.graphs import required_for_output
+from ctneat.graphs import required_for_output
 
 class CTRNNNodeEval(object):
     def __init__(self, time_constant: float, activation: Callable, aggregation: Callable, 
@@ -153,6 +153,10 @@ class CTRNN(object):
     def create(genome, config, time_constant):
         """ 
         Receives a genome and returns its phenotype (a CTRNN). 
+        Args:
+            genome: The genome to create the CTRNN from.
+            config: The configuration object.
+            time_constant: The time constant to use for all nodes.
         """
         genome_config = config.genome_config
         required = required_for_output(genome_config.input_keys, genome_config.output_keys, genome.connections)

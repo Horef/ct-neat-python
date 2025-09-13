@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from neat.activations import ActivationFunctionSet
+from ctneat.activations import ActivationFunctionSet
 
 x = np.linspace(-5.0, 5.0, 5000)
 

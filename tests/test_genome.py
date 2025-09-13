@@ -4,7 +4,7 @@ import os
 import sys
 import unittest
 
-import neat
+import ctneat
 
 
 class TestCreateNew(unittest.TestCase):
@@ -18,12 +18,12 @@ class TestCreateNew(unittest.TestCase):
         """
         local_dir = os.path.dirname(__file__)
         config_path = os.path.join(local_dir, 'test_configuration')
-        self.config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                  neat.DefaultSpeciesSet, neat.DefaultStagnation,
+        self.config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                                  ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                                   config_path)
         config2_path = os.path.join(local_dir, 'test_configuration2')
-        self.config2 = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                   neat.DefaultSpeciesSet, neat.DefaultStagnation,
+        self.config2 = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                                   ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                                    config2_path)
 
     def test_unconnected_no_hidden(self):
@@ -33,7 +33,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'unconnected'
         config.num_hidden = 0
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(self.config.genome_config)
 
@@ -48,7 +48,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'unconnected'
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(self.config.genome_config)
 
@@ -66,7 +66,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'fs_neat'
         config.num_hidden = 0
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(config)
 
@@ -84,7 +84,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'fs_neat'
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         print("\nThis should output a warning:", file=sys.stderr)
         g.configure_new(config)  # TODO: Test for emitted warning
@@ -100,7 +100,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'fs_neat_nohidden'
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(config)
 
@@ -115,7 +115,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'fs_neat_hidden'
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(config)
 
@@ -133,7 +133,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'full'
         config.num_hidden = 0
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(config)
 
@@ -155,7 +155,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'full'
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         print("\nThis should output a warning:", file=sys.stderr)
         g.configure_new(config)  # TODO: Test for emitted warning
@@ -184,7 +184,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'full_nodirect'
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(config)
 
@@ -212,7 +212,7 @@ class TestCreateNew(unittest.TestCase):
         config.initial_connection = 'full_direct'
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(config)
 
@@ -244,7 +244,7 @@ class TestCreateNew(unittest.TestCase):
         config.connection_fraction = 0.5
         config.num_hidden = 0
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(config)
 
@@ -263,7 +263,7 @@ class TestCreateNew(unittest.TestCase):
         config.connection_fraction = 0.5
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         print("\nThis should output a warning:", file=sys.stderr)
         g.configure_new(config)  # TODO: Test for emitted warning
@@ -280,7 +280,7 @@ class TestCreateNew(unittest.TestCase):
         config.connection_fraction = 0.5
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(config)
 
@@ -299,7 +299,7 @@ class TestCreateNew(unittest.TestCase):
         config.connection_fraction = 0.5
         config.num_hidden = 2
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         self.assertEqual(gid, g.key)
         g.configure_new(config)
 
@@ -319,8 +319,8 @@ class TestPruning(unittest.TestCase):
         """
         local_dir = os.path.dirname(__file__)
         config_path = os.path.join(local_dir, 'test_configuration')
-        self.config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                  neat.DefaultSpeciesSet, neat.DefaultStagnation,
+        self.config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                                  ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                                   config_path)
 
     def test_empty_network(self):
@@ -329,7 +329,7 @@ class TestPruning(unittest.TestCase):
         config.initial_connection = 'unconnected'
         config.num_hidden = 0
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         g.configure_new(config)
 
         g_pruned = g.get_pruned_copy(config)
@@ -345,7 +345,7 @@ class TestPruning(unittest.TestCase):
         config.initial_connection = 'unconnected'
         config.num_hidden = 0
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         g.configure_new(config)
         g.add_connection(config, -1, 0, 1.0, True)
         g.add_connection(config, -2, 0, 1.0, True)
@@ -361,7 +361,7 @@ class TestPruning(unittest.TestCase):
         config.initial_connection = 'unconnected'
         config.num_hidden = 0
 
-        g = neat.DefaultGenome(gid)
+        g = ctneat.DefaultGenome(gid)
         g.configure_new(config)
 
         new_node_id = config.get_new_node_key(g.nodes)

@@ -1,8 +1,8 @@
-import neat
+import ctneat
 
 
 def eval_mono_image(genome, config, width, height):
-    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    net = ctneat.nn.FeedForwardNetwork.create(genome, config)
     image = []
     for r in range(height):
         y = -2.0 + 4.0 * r / (height - 1)
@@ -18,7 +18,7 @@ def eval_mono_image(genome, config, width, height):
 
 
 def eval_gray_image(genome, config, width, height):
-    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    net = ctneat.nn.FeedForwardNetwork.create(genome, config)
     image = []
     for r in range(height):
         y = -1.0 + 2.0 * r / (height - 1)
@@ -35,7 +35,7 @@ def eval_gray_image(genome, config, width, height):
 
 
 def eval_color_image(genome, config, width, height):
-    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    net = ctneat.nn.FeedForwardNetwork.create(genome, config)
     image = []
     for r in range(height):
         y = -1.0 + 2.0 * r / (height - 1)

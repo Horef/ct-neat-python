@@ -4,7 +4,7 @@ import pickle
 import pygame
 
 import common
-import neat
+import ctneat
 
 pygame.init()
 
@@ -52,8 +52,8 @@ class InteractiveStagnation(object):
         return result
 
 
-config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                     neat.DefaultSpeciesSet, InteractiveStagnation,
+config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                     ctneat.DefaultSpeciesSet, InteractiveStagnation,
                      config_path)
 
 fn = 'rendered/genome-26636-1634.bin'

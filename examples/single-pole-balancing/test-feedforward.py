@@ -5,7 +5,7 @@ Test the performance of the best genome produced by evolve-feedforward.py.
 import os
 import pickle
 
-import neat
+import ctneat
 from cart_pole import CartPole, discrete_actuator_force
 from movie import make_movie
 
@@ -20,11 +20,11 @@ print(c)
 # the same directory as this script.
 local_dir = os.path.dirname(__file__)
 config_path = os.path.join(local_dir, 'config-feedforward')
-config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                     neat.DefaultSpeciesSet, neat.DefaultStagnation,
+config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                     ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                      config_path)
 
-net = neat.nn.FeedForwardNetwork.create(c, config)
+net = ctneat.nn.FeedForwardNetwork.create(c, config)
 sim = CartPole()
 
 print()

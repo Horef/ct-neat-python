@@ -2,7 +2,7 @@ import os
 import pickle
 
 import evolve_interactive as evolve
-import neat
+import ctneat
 
 evolve.W = 1000
 evolve.H = 1000
@@ -18,11 +18,11 @@ with open("genome-4432-586.bin", "rb") as f:
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'interactive_config_gray')
     # Note that we provide the custom stagnation class to the Config constructor.
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, evolve.InteractiveStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, evolve.InteractiveStagnation,
                          config_path)
 
-    net = neat.nn.FeedForwardNetwork.create(g, config)
+    net = ctneat.nn.FeedForwardNetwork.create(g, config)
 
     # pb = evolve.PictureBreeder(128, 128, 1500, 1500, 1280, 1024, 'color', 4)
     # pb.make_high_resolution(g, config)

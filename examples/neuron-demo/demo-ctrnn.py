@@ -6,17 +6,17 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-import neat
-from neat.activations import sigmoid_activation
+import ctneat
+from ctneat.activations import sigmoid_activation
 
 # Create a fully-connected network of two neurons with no external inputs.
 node1_inputs = [(1, 0.9), (2, 0.2)]
 node2_inputs = [(1, -0.2), (2, 0.9)]
 
-node_evals = {1: neat.ctrnn.CTRNNNodeEval(0.01, sigmoid_activation, sum, -2.75 / 5.0, 1.0, node1_inputs),
-              2: neat.ctrnn.CTRNNNodeEval(0.01, sigmoid_activation, sum, -1.75 / 5.0, 1.0, node2_inputs)}
+node_evals = {1: ctneat.ctrnn.CTRNNNodeEval(0.01, sigmoid_activation, sum, -2.75 / 5.0, 1.0, node1_inputs),
+              2: ctneat.ctrnn.CTRNNNodeEval(0.01, sigmoid_activation, sum, -1.75 / 5.0, 1.0, node2_inputs)}
 
-net = neat.ctrnn.CTRNN([], [1, 2], node_evals)
+net = ctneat.ctrnn.CTRNN([], [1, 2], node_evals)
 
 init1 = 0.0
 init2 = 0.0

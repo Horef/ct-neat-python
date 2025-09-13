@@ -1,7 +1,7 @@
 import os
 import unittest
 
-import neat
+import ctneat
 
 
 class ConfigTests(unittest.TestCase):
@@ -17,8 +17,8 @@ class ConfigTests(unittest.TestCase):
         config_path_save = os.path.join(local_dir, config_filename_save)
 
         # Load initial configuration from file
-        config_initial = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                     neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path_initial)
+        config_initial = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                                     ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation, config_path_initial)
 
         config1 = config_initial.genome_config
         names1 = [p.name for p in config1._params]
@@ -29,8 +29,8 @@ class ConfigTests(unittest.TestCase):
         config_initial.save(config_path_save)
 
         # Obtain configuration from saved file
-        config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                             neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path_save)
+        config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                             ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation, config_path_save)
 
         config2 = config.genome_config
         names2 = [p.name for p in config2._params]
@@ -56,8 +56,8 @@ class ConfigTests(unittest.TestCase):
         config_path_save = os.path.join(local_dir, config_filename_save)
 
         # Load initial configuration from file
-        config_initial = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                     neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path_initial)
+        config_initial = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                                     ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation, config_path_initial)
 
         config1 = config_initial.genome_config
         names1 = [p.name for p in config1._params]
@@ -68,8 +68,8 @@ class ConfigTests(unittest.TestCase):
         config_initial.save(config_path_save)
 
         # Obtain configuration from saved file
-        config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                             neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path_save)
+        config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                             ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation, config_path_save)
 
         config2 = config.genome_config
         names2 = [p.name for p in config2._params]
@@ -95,8 +95,8 @@ class ConfigTests(unittest.TestCase):
         config_path_save = os.path.join(local_dir, config_filename_save)
 
         # Load initial configuration from file
-        config_initial = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                     neat.DefaultSpeciesSet, neat.DefaultStagnation,
+        config_initial = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                                     ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                                      config_path_initial)
 
         config_initial.genome_config.connection_fraction = 1.5

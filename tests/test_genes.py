@@ -1,2 +1,2 @@
-from neat import genes
+from ctneat import genes
 

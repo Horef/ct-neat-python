@@ -20,7 +20,7 @@ import argparse
 import os
 import sys
 
-import neat
+import ctneat
 import visualize
 
 # 2-input XOR inputs and expected outputs.
@@ -41,7 +41,7 @@ def eval_genome(genome, config):
     otherwise you'll have made a fork bomb instead of a neuroevolution demo. :)
     """
 
-    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    net = ctneat.nn.FeedForwardNetwork.create(genome, config)
     error = 4.0
     for xi, xo in zip(xor_inputs, xor_outputs):
         output = net.activate(xi)
@@ -51,20 +51,20 @@ def eval_genome(genome, config):
 
 def run(config_file, addr, authkey, mode, workers):
     # Load configuration.
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_file)
 
     # Create the population, which is the top-level object for a NEAT run.
-    p = neat.Population(config)
+    p = ctneat.Population(config)
 
     # Add a stdout reporter to show progress in the terminal.
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
+    p.add_reporter(ctneat.StdOutReporter(True))
+    stats = ctneat.StatisticsReporter()
     p.add_reporter(stats)
 
     # setup an DistributedEvaluator
-    de = neat.DistributedEvaluator(
+    de = ctneat.DistributedEvaluator(
         addr,  # connect to addr
         authkey,  # use authkey to authenticate
         eval_genome,  # use eval_genome() to evaluate a genome
@@ -101,7 +101,7 @@ def run(config_file, addr, authkey, mode, workers):
 
     # Show output of the most fit genome against training data.
     print('\nOutput:')
-    winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
+    winner_net = ctneat.nn.FeedForwardNetwork.create(winner, config)
     for xi, xo in zip(xor_inputs, xor_outputs):
         output = winner_net.activate(xi)
         print("input {!r}, expected output {!r}, got {!r}".format(xi, xo, output))
@@ -156,8 +156,8 @@ if __name__ == '__main__':
     parser.add_argument(
         "--force-secondary", "--force-slave",
         action="store_const",
-        const=neat.distributed.MODE_SECONDARY,
-        default=neat.distributed.MODE_AUTO,
+        const=ctneat.distributed.MODE_SECONDARY,
+        default=ctneat.distributed.MODE_AUTO,
         help="Force secondary mode (useful for debugging)",
         dest="mode",
     )
@@ -169,7 +169,7 @@ if __name__ == '__main__':
     authkey = ns.authkey
     mode = ns.mode
 
-    if (host in ("0.0.0.0", "localhost", "")) and (mode == neat.distributed.MODE_AUTO):
+    if (host in ("0.0.0.0", "localhost", "")) and (mode == ctneat.distributed.MODE_AUTO):
         # print an error message
         # we are using auto-mode determination in this example,
         # which does not work well with '0.0.0.0' or 'localhost'.

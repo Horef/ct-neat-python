@@ -2,7 +2,7 @@
 import warnings
 from random import random
 
-from neat.attributes import FloatAttribute, BoolAttribute, StringAttribute
+from ctneat.attributes import FloatAttribute, BoolAttribute, StringAttribute
 
 
 # TODO: There is probably a lot of room for simplification of these classes using metaprogramming.

@@ -17,15 +17,15 @@ except ImportError:
 else:
     HAVE_THREADING = True
 
-import neat
-from neat.distributed import chunked, MODE_AUTO, MODE_PRIMARY, MODE_SECONDARY, ModeError, _STATE_RUNNING
+import ctneat
+from ctneat.distributed import chunked, MODE_AUTO, MODE_PRIMARY, MODE_SECONDARY, ModeError, _STATE_RUNNING
 
 ON_PYPY = platform.python_implementation().upper().startswith("PYPY")
 
 
 def eval_dummy_genome_nn(genome, config):
     """dummy evaluation function"""
-    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    net = ctneat.nn.FeedForwardNetwork.create(genome, config)
     return 0.0
 
 
@@ -87,7 +87,7 @@ def test_host_is_local():
     )
     for hostname, islocal in tests:
         try:
-            result = neat.host_is_local(hostname)
+            result = ctneat.host_is_local(hostname)
         except EnvironmentError:  # give more feedback
             print("test_host_is_local: Error with hostname {0!r} (expected {1!r})".format(hostname,
                                                                                           islocal))
@@ -117,7 +117,7 @@ def test_DistributedEvaluator_mode():
     for hostname, mode, expected in tests:
         addr = (hostname, 8022)
         try:
-            de = neat.DistributedEvaluator(
+            de = ctneat.DistributedEvaluator(
                 addr,
                 authkey=b"abcd1234",
                 eval_function=eval_dummy_genome_nn,
@@ -145,7 +145,7 @@ def test_DistributedEvaluator_mode():
             )
     # test invalid mode error
     try:
-        de = neat.DistributedEvaluator(
+        de = ctneat.DistributedEvaluator(
             addr,
             authkey=b"abcd1234",
             eval_function=eval_dummy_genome_nn,
@@ -160,7 +160,7 @@ def test_DistributedEvaluator_mode():
 
 def test_DistributedEvaluator_primary_restrictions():
     """Tests that some primary-exclusive methods fail when called by the secondaries"""
-    secondary = neat.DistributedEvaluator(
+    secondary = ctneat.DistributedEvaluator(
         ("localhost", 8022),
         authkey=b"abcd1234",
         eval_function=eval_dummy_genome_nn,
@@ -186,7 +186,7 @@ def test_DistributedEvaluator_primary_restrictions():
 
 def test_DistributedEvaluator_state_error1():
     """Tests that attempts to use an unstarted manager for set_secondary_state cause an error."""
-    primary = neat.DistributedEvaluator(
+    primary = ctneat.DistributedEvaluator(
         ("localhost", 8022),
         authkey=b"abcd1234",
         eval_function=eval_dummy_genome_nn,
@@ -202,7 +202,7 @@ def test_DistributedEvaluator_state_error1():
 
 def test_DistributedEvaluator_state_error2():
     """Tests that attempts to use an unstarted manager for get_inqueue cause an error."""
-    primary = neat.DistributedEvaluator(
+    primary = ctneat.DistributedEvaluator(
         ("localhost", 8022),
         authkey=b"abcd1234",
         eval_function=eval_dummy_genome_nn,
@@ -218,7 +218,7 @@ def test_DistributedEvaluator_state_error2():
 
 def test_DistributedEvaluator_state_error3():
     """Tests that attempts to use an unstarted manager for get_outqueue cause an error."""
-    primary = neat.DistributedEvaluator(
+    primary = ctneat.DistributedEvaluator(
         ("localhost", 8022),
         authkey=b"abcd1234",
         eval_function=eval_dummy_genome_nn,
@@ -234,7 +234,7 @@ def test_DistributedEvaluator_state_error3():
 
 def test_DistributedEvaluator_state_error4():
     """Tests that attempts to use an unstarted manager for get_namespace cause an error."""
-    primary = neat.DistributedEvaluator(
+    primary = ctneat.DistributedEvaluator(
         ("localhost", 8022),
         authkey=b"abcd1234",
         eval_function=eval_dummy_genome_nn,
@@ -250,7 +250,7 @@ def test_DistributedEvaluator_state_error4():
 
 def test_DistributedEvaluator_state_error5():
     """Tests that attempts to set an invalid state cause an error."""
-    primary = neat.DistributedEvaluator(
+    primary = ctneat.DistributedEvaluator(
         ("localhost", 8022),
         authkey=b"abcd1234",
         eval_function=eval_dummy_genome_nn,
@@ -381,21 +381,21 @@ def run_primary(addr, authkey, generations):
     # Load configuration.
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'test_configuration')
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_path)
 
     # Create the population, which is the top-level object for a NEAT run.
-    p = neat.Population(config)
+    p = ctneat.Population(config)
 
     # Add a stdout reporter to show progress in the terminal.
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
+    p.add_reporter(ctneat.StdOutReporter(True))
+    stats = ctneat.StatisticsReporter()
     p.add_reporter(stats)
-    p.add_reporter(neat.Checkpointer(max(1, int(generations / 3)), 5))
+    p.add_reporter(ctneat.Checkpointer(max(1, int(generations / 3)), 5))
 
     # Run for the specified number of generations.
-    de = neat.DistributedEvaluator(
+    de = ctneat.DistributedEvaluator(
         addr,
         authkey=authkey,
         eval_function=eval_dummy_genome_nn,
@@ -422,20 +422,20 @@ def run_secondary(addr, authkey, num_workers=1):
     # Load configuration.
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'test_configuration')
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_path)
 
     # Create the population, which is the top-level object for a NEAT run.
-    p = neat.Population(config)
+    p = ctneat.Population(config)
 
     # Add a stdout reporter to show progress in the terminal.
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
+    p.add_reporter(ctneat.StdOutReporter(True))
+    stats = ctneat.StatisticsReporter()
     p.add_reporter(stats)
 
     # Run for the specified number of generations.
-    de = neat.DistributedEvaluator(
+    de = ctneat.DistributedEvaluator(
         addr,
         authkey=authkey,
         eval_function=eval_dummy_genome_nn,

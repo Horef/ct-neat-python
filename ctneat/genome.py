@@ -4,12 +4,12 @@ import sys
 from itertools import count
 from random import choice, random, shuffle
 
-from neat.activations import ActivationFunctionSet
-from neat.aggregations import AggregationFunctionSet
-from neat.config import ConfigParameter, write_pretty_params
-from neat.genes import DefaultConnectionGene, DefaultNodeGene
-from neat.graphs import creates_cycle
-from neat.graphs import required_for_output
+from ctneat.activations import ActivationFunctionSet
+from ctneat.aggregations import AggregationFunctionSet
+from ctneat.config import ConfigParameter, write_pretty_params
+from ctneat.genes import DefaultConnectionGene, DefaultNodeGene
+from ctneat.graphs import creates_cycle
+from ctneat.graphs import required_for_output
 
 
 class DefaultGenomeConfig(object):

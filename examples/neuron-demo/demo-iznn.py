@@ -5,7 +5,7 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-import neat
+import ctneat
 
 
 def plot_spikes(spikes, title):
@@ -55,7 +55,7 @@ def plot_spikes(spikes, title):
 
 
 def show(title, a, b, c, d):
-    n = neat.iznn.IZNeuron(0.0, a, b, c, d, [])
+    n = ctneat.iznn.IZNeuron(0.0, a, b, c, d, [])
     spike_train = []
     for i in range(1000):
         n.current = 0.0 if i < 100 or i > 800 else 10.0
@@ -66,15 +66,15 @@ def show(title, a, b, c, d):
     plot_spikes(spike_train, title)
 
 
-show('regular spiking', **neat.iznn.REGULAR_SPIKING_PARAMS)
+show('regular spiking', **ctneat.iznn.REGULAR_SPIKING_PARAMS)
 
-show('intrinsically bursting', **neat.iznn.INTRINSICALLY_BURSTING_PARAMS)
+show('intrinsically bursting', **ctneat.iznn.INTRINSICALLY_BURSTING_PARAMS)
 
-show('chattering', **neat.iznn.CHATTERING_PARAMS)
+show('chattering', **ctneat.iznn.CHATTERING_PARAMS)
 
-show('fast spiking', **neat.iznn.FAST_SPIKING_PARAMS)
+show('fast spiking', **ctneat.iznn.FAST_SPIKING_PARAMS)
 
-show('low-threshold spiking', **neat.iznn.LOW_THRESHOLD_SPIKING_PARAMS)
+show('low-threshold spiking', **ctneat.iznn.LOW_THRESHOLD_SPIKING_PARAMS)
 
 show('thalamo-cortical', 0.02, 0.25, -65.0, 0.05)
 

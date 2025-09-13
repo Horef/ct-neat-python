@@ -6,14 +6,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import graphviz
 from sklearn.decomposition import PCA
+from typing import Optional
 
-def draw_ctrnn_net(node_list: list, node_inputs: dict):
+def draw_ctrnn_net(node_list: list, node_inputs: dict, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
     This function draws the CTRNN network structure.
     Args:
         node_list: A list of node IDs in the network.
         node_inputs: A dictionary where keys are node IDs and values are lists of input connections for each node.
         (I.e. each list contains tuples of (input_node_id, weight) for the node with the corresponding ID)
+        dir_name: Optional directory name to save the output file. If None, saves in the current directory.
+        file_name: Optional file name to save the output file. If None, defaults to 'ctrnn_network'.
+    Returns:
+        None
     """
 
     dot = graphviz.Digraph()
@@ -25,14 +30,20 @@ def draw_ctrnn_net(node_list: list, node_inputs: dict):
         for input_node_id, weight in inputs:
             dot.edge(str(input_node_id), str(node_id), label=str(weight))
 
-    dot.render('ctrnn_network', format='png', cleanup=True)
+    dot.render(file_name or 'ctrnn_network', format='png', cleanup=True, directory=dir_name or '.')
 
-def draw_ctrnn_dynamics(states: np.ndarray):
+def draw_ctrnn_dynamics(states: np.ndarray, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
     This function draws the dynamics of the CTRNN over time.
     Args:
         states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
         and each column corresponds to a specific node's state.
+        save: Whether to save the plot as a file. If False, the plot is shown interactively.
+        show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.
+        dir_name: Optional directory name to save the output file. If None, saves in the current directory.
+        file_name: Optional file name to save the output file. If None, defaults to 'ctrnn_dynamics'.
+    Returns:
+        None
     """
 
     plt.figure()
@@ -45,9 +56,12 @@ def draw_ctrnn_dynamics(states: np.ndarray):
         plt.plot(states[i], label=f"Node {i+1}")
 
     plt.legend(loc="best")
-    plt.show()
+    if save:
+        plt.savefig(f"{dir_name + '/' if dir_name else ''}{file_name or 'ctrnn_dynamics'}.png")
+    if show:
+        plt.show()
 
-def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2) -> None:
+def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
     This function draws a face portrait of the CTRNN's state space.
     If there are more than 'n_components' nodes, the PCA is used to reduce the dimensionality to 'n_components'.
@@ -55,6 +69,10 @@ def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2) -> None:
         states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
         and each column corresponds to a specific node's state.
         n_components: The number of components to reduce to (default is 2, max is 3).
+        save: Whether to save the plot as a file. If False, the plot is shown interactively.
+        show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.
+        dir_name: Optional directory name to save the output file. If None, saves in the current directory.
+        file_name: Optional file name to save the output file. If None, defaults to 'ctrnn_face_portrait'.
     Returns:
         None
     Raises:
@@ -77,7 +95,6 @@ def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2) -> None:
 
         plt.scatter(range(reduced_states.shape[0]), reduced_states[:, 0], color='b', s=5)
 
-        plt.show()
     elif n_components == 2:
         plt.figure(figsize=(10,10))
         plt.title("CTRNN Face Portrait")
@@ -88,7 +105,6 @@ def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2) -> None:
         for i in range(reduced_states.shape[0]):
             plt.scatter(reduced_states[i, 0], reduced_states[i, 1], color='b', s=5)
 
-        plt.show()
     elif n_components == 3:
         plt.figure(figsize=(10,10))
         ax = plt.axes(projection='3d')
@@ -101,4 +117,7 @@ def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2) -> None:
 
         ax.plot3D(reduced_states[:, 0], reduced_states[:, 1], reduced_states[:, 2], color='b')
 
+    if save:
+        plt.savefig(f"{dir_name + '/' if dir_name else ''}{file_name or 'ctrnn_face_portrait'}.png")
+    if show:
         plt.show()

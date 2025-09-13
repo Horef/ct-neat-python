@@ -1,7 +1,7 @@
 import os
 
-import neat
-from neat import aggregations
+import ctneat
+from ctneat import aggregations
 
 
 # TODO: These tests are just smoke tests to make sure nothing has become badly broken.  Expand
@@ -62,8 +62,8 @@ def minabs_aggregation(x):
 def test_add_minabs():
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'test_configuration')
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_path)
     config.genome_config.add_aggregation('minabs', minabs_aggregation)
     assert config.genome_config.aggregation_function_defs.get('minabs') is not None
@@ -106,8 +106,8 @@ def test_function_set():
 def test_bad_add1():
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'test_configuration')
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_path)
 
     try:
@@ -121,8 +121,8 @@ def test_bad_add1():
 def test_bad_add2():
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'test_configuration')
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    config = ctneat.Config(ctneat.DefaultGenome, ctneat.DefaultReproduction,
+                         ctneat.DefaultSpeciesSet, ctneat.DefaultStagnation,
                          config_path)
 
     try:
