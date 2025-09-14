@@ -9,6 +9,7 @@ IEEE TRANSACTIONS ON NEURAL NETWORKS, VOL. 14, NO. 6, NOVEMBER 2003
 
 http://www.izhikevich.org/publications/spikes.pdf
 """
+import numpy as np
 
 from ctneat.attributes import FloatAttribute
 from ctneat.genes import BaseGene, DefaultConnectionGene
@@ -89,23 +90,44 @@ class IZNeuron(object):
         # Input current (milliamps).
         self.current = self.bias
 
-    def advance(self, dt_msec: float):
+    def _derivatives(self, state: np.ndarray, current: float) -> np.ndarray:
         """
-        Advances simulation time by the given time step in milliseconds.
+        Calculates the derivatives dv/dt and du/dt for a given state.
+        
+        Args:
+            state (np.array): A numpy array [v, u].
+            current (float): The input current I.
+            
+        Returns:
+            np.array: A numpy array [dv/dt, du/dt].
+        """
+        v, u = state
+        dv_dt = 0.04 * v**2 + 5 * v + 140 - u + current
+        du_dt = self.a * (self.b * v - u)
+        return np.array([dv_dt, du_dt])
 
-        v' = 0.04 * v^2 + 5v + 140 - u + I
-        u' = a * (b * v - u)
+    def advance_fe(self, dt_msec: float):
+        """
+        Advances simulation time by the given time step in milliseconds using simple forward Euler integration.
 
         if v >= 30 then
             v <- c, u <- u + d
+        else
+            v' = 0.04 * v^2 + 5v + 140 - u + I
+            u' = a * (b * v - u)
         
         Args:
             dt_msec (float): The time step in milliseconds.
         """
-        # TODO: Choose an appropriate
-        # numerical integration method to maintain stability.
-        # TODO: The need to catch overflows indicates that the current method is
-        # not stable for all possible network configurations and states.
+        # The spike detection and reset logic must happen *after* the integration step and before the current step.
+        self.fired = 0.0
+        if self.v > 30.0:
+            # Output spike and reset.
+            self.fired = 1.0
+            self.v = self.c
+            self.u += self.d
+            return # End the step here after a reset
+        
         try:
             self.v += 0.5 * dt_msec * (0.04 * self.v ** 2 + 5 * self.v + 140 - self.u + self.current)
             self.v += 0.5 * dt_msec * (0.04 * self.v ** 2 + 5 * self.v + 140 - self.u + self.current)
@@ -115,12 +137,47 @@ class IZNeuron(object):
             self.v = self.c
             self.u = self.b * self.v
 
+    def advance_rk4(self, dt_msec: float):
+        """
+        Advances simulation time using 4th-Order Runge-Kutta.
+        
+        if v >= 30 then
+            v <- c, u <- u + d
+        else
+            v' = 0.04 * v^2 + 5v + 140 - u + I
+            u' = a * (b * v - u)
+
+        Args:
+            dt_msec (float): The time step in milliseconds.
+        """
+        # The spike detection and reset logic must happen *after* the integration step.
         self.fired = 0.0
-        if self.v > 30.0:
+        if self.v >= 30.0:
             # Output spike and reset.
             self.fired = 1.0
             self.v = self.c
             self.u += self.d
+            return # End the step here after a reset
+
+        try:
+            y = np.array([self.v, self.u])
+            h = dt_msec
+
+            k1 = self._derivatives(y, self.current)
+            k2 = self._derivatives(y + 0.5 * h * k1, self.current)
+            k3 = self._derivatives(y + 0.5 * h * k2, self.current)
+            k4 = self._derivatives(y + h * k3, self.current)
+
+            # Update state variables v and u
+            y_new = y + (h / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
+            self.v, self.u = y_new
+
+        except (OverflowError, ValueError):
+            # If integration fails (e.g., due to instability), reset without spiking.
+            # This is more robust than just catching OverflowError.
+            self.v = self.c
+            self.u = self.b * self.v
+
 
     def reset(self):
         """Resets all state variables."""
@@ -128,7 +185,6 @@ class IZNeuron(object):
         self.u = self.b * self.v
         self.fired = 0.0
         self.current = self.bias
-
 
 class IZNN(object):
     """Basic iznn network object."""
@@ -169,16 +225,18 @@ class IZNN(object):
         self.time_ms = 0.0
 
     def get_time_step_msec(self):
-        # pylint: disable=no-self-use
-        # TODO: Investigate performance or numerical stability issues that may
-        # result from using this hard-coded time step.
+        """
+        Returns a safe time step in milliseconds for the current network configuration.
+        This is a placeholder implementation and should be replaced with a proper calculation.
+        """
         return 0.05
 
-    def advance(self, dt_msec, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
+    def advance(self, dt_msec, method: str = 'rk4', ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """
         Advances the simulation by the given time step in milliseconds.
         Args:
             dt_msec (float): The time step in milliseconds.
+            method (str): The integration method to use ('fe' for Forward Euler, 'rk4' for 4th-Order Runge-Kutta).
             ret (list(str) or str or None): Specifies what to return.
                 If a list of strings, returns a list of lists, where each inner list corresponds to
                 the requested attribute for all output neurons.
@@ -191,7 +249,11 @@ class IZNN(object):
                     'all' - returns a list of lists: [fired states, voltages, recovery variables]
         Returns:
             A list or a list of lists as specified by the 'ret' parameter.
+        Raises:
+            ValueError: If an invalid integration method is specified.
         """
+        if method not in ('fe', 'rk4'):
+            raise ValueError("Invalid integration method: {0}".format(method))
 
         for n in self.neurons.values():
             n.current = n.bias
@@ -209,7 +271,10 @@ class IZNN(object):
                 n.current += ivalue * w
 
         for n in self.neurons.values():
-            n.advance(dt_msec)
+            if method == 'rk4':
+                n.advance_rk4(dt_msec)
+            else:
+                n.advance_fe(dt_msec)
         self.time_ms += dt_msec
 
         out_neurons_firing = [self.neurons[i].fired for i in self.outputs]

@@ -61,7 +61,7 @@ def show(title, a, b, c, d):
         n.current = 0.0 if i < 100 or i > 800 else 10.0
         spike_train.append((1.0 * i, n.current, n.v, n.u, n.fired))
         print('{0:d}\t{1:f}\t{2:f}\t{3:f}'.format(i, n.current, n.v, n.u))
-        n.advance(0.25)
+        n.advance_fe(0.25)
 
     plot_spikes(spike_train, title)
 

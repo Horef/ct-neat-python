@@ -7,7 +7,7 @@ def test_basic():
     spike_train = []
     for i in range(1000):
         spike_train.append(n.v)
-        n.advance(0.25)
+        n.advance_fe(0.25)
 
 
 def test_network():
