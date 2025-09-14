@@ -29,7 +29,7 @@ net.set_inputs([init0])
 times = [0.0]
 outputs = [[n1.fired, n2.fired]]
 for i in range(400):
-    output = net.advance(0.05, method='rk4', ret='voltages')
+    output = net.advance(0.05, method='RK45', ret='voltages')
     times.append(net.time_ms)
     outputs.append(output)
     

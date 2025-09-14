@@ -10,6 +10,7 @@ IEEE TRANSACTIONS ON NEURAL NETWORKS, VOL. 14, NO. 6, NOVEMBER 2003
 http://www.izhikevich.org/publications/spikes.pdf
 """
 import numpy as np
+from scipy.integrate import solve_ivp
 
 from ctneat.attributes import FloatAttribute
 from ctneat.genes import BaseGene, DefaultConnectionGene
@@ -43,6 +44,22 @@ class IZNodeGene(BaseGene):
                         FloatAttribute('b'),
                         FloatAttribute('c'),
                         FloatAttribute('d')]
+
+    @property
+    def a(self):
+        return self.__getattribute__('a')
+
+    @property
+    def b(self):
+        return self.__getattribute__('b')
+
+    @property
+    def c(self):
+        return self.__getattribute__('c')
+
+    @property
+    def d(self):
+        return self.__getattribute__('d')
 
     def distance(self, other, config):
         s = abs(self.a - other.a) + abs(self.b - other.b) \
@@ -106,36 +123,15 @@ class IZNeuron(object):
         du_dt = self.a * (self.b * v - u)
         return np.array([dv_dt, du_dt])
 
-    def advance_fe(self, dt_msec: float):
+    def _derivatives_scipy(self, t, y):
         """
-        Advances simulation time by the given time step in milliseconds using simple forward Euler integration.
-
-        if v >= 30 then
-            v <- c, u <- u + d
-        else
-            v' = 0.04 * v^2 + 5v + 140 - u + I
-            u' = a * (b * v - u)
-        
-        Args:
-            dt_msec (float): The time step in milliseconds.
+        Calculates the derivatives for SciPy's solve_ivp.
+        Signature must be f(t, y).
         """
-        # The spike detection and reset logic must happen *after* the integration step and before the current step.
-        self.fired = 0.0
-        if self.v > 30.0:
-            # Output spike and reset.
-            self.fired = 1.0
-            self.v = self.c
-            self.u += self.d
-            return # End the step here after a reset
-        
-        try:
-            self.v += 0.5 * dt_msec * (0.04 * self.v ** 2 + 5 * self.v + 140 - self.u + self.current)
-            self.v += 0.5 * dt_msec * (0.04 * self.v ** 2 + 5 * self.v + 140 - self.u + self.current)
-            self.u += dt_msec * self.a * (self.b * self.v - self.u)
-        except OverflowError:
-            # Reset without producing a spike.
-            self.v = self.c
-            self.u = self.b * self.v
+        v, u = y
+        dv_dt = 0.04 * v**2 + 5 * v + 140 - u + self.current
+        du_dt = self.a * (self.b * v - u)
+        return [dv_dt, du_dt]
 
     def advance_rk4(self, dt_msec: float):
         """
@@ -178,6 +174,42 @@ class IZNeuron(object):
             self.v = self.c
             self.u = self.b * self.v
 
+    def advance_scipy(self, dt_msec: float, method: str = 'RK45'):
+        """
+        Advances simulation time using a solver from SciPy.
+        
+        Args:
+            dt_msec (float): The time step in milliseconds.
+            method (str): The integration method to use (e.g., 'RK45', 'LSODA').
+                Other options are listed in the SciPy documentation for solve_ivp 
+                (https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html).
+        """
+        self.fired = 0.0
+        if self.v >= 30.0:
+            self.fired = 1.0
+            self.v = self.c
+            self.u += self.d
+            return
+
+        try:
+            y0 = [self.v, self.u]
+            t_span = [0, dt_msec]
+
+            # Call the solver
+            sol = solve_ivp(
+                fun=self._derivatives_scipy,
+                t_span=t_span,
+                y0=y0,
+                method=method,
+                t_eval=[dt_msec]  # We only need the state at the end of the interval
+            )
+
+            # Update the neuron's state from the solution
+            self.v, self.u = sol.y[:, -1]
+
+        except (OverflowError, ValueError):
+            self.v = self.c
+            self.u = self.b * self.v
 
     def reset(self):
         """Resets all state variables."""
@@ -231,12 +263,21 @@ class IZNN(object):
         """
         return 0.05
 
-    def advance(self, dt_msec, method: str = 'rk4', ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
+    def advance(self, dt_msec, method: Optional[str] = None, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """
         Advances the simulation by the given time step in milliseconds.
         Args:
             dt_msec (float): The time step in milliseconds.
-            method (str): The integration method to use ('fe' for Forward Euler, 'rk4' for 4th-Order Runge-Kutta).
+            method (str): The integration method to use. If not specified, defaults to manually written RK4.
+                If specified, uses SciPy's solve_ivp with the given method.
+                Valid methods are listed in the SciPy documentation for solve_ivp
+                (https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html).
+                And here is a summary of available methods:
+                    - 'RK45' (Default): An adaptive Runge-Kutta method of order 5(4). It's a great general-purpose choice and a good starting point.
+                    - 'RK23': A lower-order adaptive Runge-Kutta method. Faster but less accurate than RK45.
+                    - 'DOP853': A high-order (8th) adaptive Runge-Kutta method for when you need very high precision.
+                    - 'LSODA': This is a particularly important one for spiking neurons. It's a solver that automatically switches between methods for non-stiff and stiff problems. A "stiff" ODE is one where some parts of the solution change very rapidly while others change slowly (like the membrane potential during a spike!). LSODA is often very efficient and stable for these kinds of systems.
+                    - 'BDF' and 'Radau': Other excellent methods for stiff problems.
             ret (list(str) or str or None): Specifies what to return.
                 If a list of strings, returns a list of lists, where each inner list corresponds to
                 the requested attribute for all output neurons.
@@ -252,8 +293,8 @@ class IZNN(object):
         Raises:
             ValueError: If an invalid integration method is specified.
         """
-        if method not in ('fe', 'rk4'):
-            raise ValueError("Invalid integration method: {0}".format(method))
+        if method not in ['RK45', 'RK23', 'DOP853', 'LSODA', 'BDF', 'Radau']:
+            raise ValueError(f"Invalid integration method '{method}'. Valid methods are 'RK45', 'RK23', 'DOP853', 'LSODA', 'BDF', 'Radau'.")
 
         for n in self.neurons.values():
             n.current = n.bias
@@ -271,10 +312,10 @@ class IZNN(object):
                 n.current += ivalue * w
 
         for n in self.neurons.values():
-            if method == 'rk4':
+            if method is None:
                 n.advance_rk4(dt_msec)
             else:
-                n.advance_fe(dt_msec)
+                n.advance_scipy(dt_msec, method=method)
         self.time_ms += dt_msec
 
         out_neurons_firing = [self.neurons[i].fired for i in self.outputs]
