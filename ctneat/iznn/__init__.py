@@ -107,6 +107,13 @@ class IZNeuron(object):
         # Input current (milliamps).
         self.current = self.bias
 
+    def _spike_event(self, t, y):
+        """Event function: returns 0 when v crosses 30mV."""
+        v, u = y
+        return v - 30.0
+    _spike_event.terminal = True  # Stop integration when the event is found
+    _spike_event.direction = 1     # Trigger only when crossing from below (v is increasing)
+
     def _derivatives(self, state: np.ndarray, current: float) -> np.ndarray:
         """
         Calculates the derivatives dv/dt and du/dt for a given state.
@@ -127,6 +134,12 @@ class IZNeuron(object):
         """
         Calculates the derivatives for SciPy's solve_ivp.
         Signature must be f(t, y).
+
+        Args:
+            t (float): Current time (not used in this model).
+            y (list): A list [v, u] where v is the membrane potential and u is the recovery variable.
+        Returns:
+            list: A list [dv/dt, du/dt].
         """
         v, u = y
         dv_dt = 0.04 * v**2 + 5 * v + 140 - u + self.current
@@ -211,6 +224,43 @@ class IZNeuron(object):
             self.v = self.c
             self.u = self.b * self.v
 
+    def advance_scipy_events(self, dt_msec: float, method: str = 'RK45'):
+        """
+        Advances the simulation using SciPy's solve_ivp with event detection.
+        This method detects spikes (when v crosses 30mV) during the integration step.
+
+        Args:
+            dt_msec (float): The time step in milliseconds.
+            method (str): The integration method to use (e.g., 'RK45', 'LSODA').
+        """
+
+        self.fired = 0.0
+        
+        try:
+            y0 = [self.v, self.u]
+            t_span = [0, dt_msec]
+
+            sol = solve_ivp(
+                fun=self._derivatives_scipy,
+                t_span=t_span,
+                y0=y0,
+                method=method,
+                events=self._spike_event
+            )
+
+            # Check if a spike event was triggered
+            if sol.t_events[0].size > 0:
+                self.fired = 1.0
+                self.v = self.c
+                self.u += self.d
+            else:
+                # No spike, just update to the final state
+                self.v, self.u = sol.y[:, -1]
+        
+        except (OverflowError, ValueError):
+            self.v = self.c
+            self.u = self.b * self.v
+
     def reset(self):
         """Resets all state variables."""
         self.v = self.c
@@ -263,7 +313,7 @@ class IZNN(object):
         """
         return 0.05
 
-    def advance(self, dt_msec, method: Optional[str] = None, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
+    def advance(self, dt_msec, method: Optional[str] = None, events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """
         Advances the simulation by the given time step in milliseconds.
         Args:
@@ -278,6 +328,7 @@ class IZNN(object):
                     - 'DOP853': A high-order (8th) adaptive Runge-Kutta method for when you need very high precision.
                     - 'LSODA': This is a particularly important one for spiking neurons. It's a solver that automatically switches between methods for non-stiff and stiff problems. A "stiff" ODE is one where some parts of the solution change very rapidly while others change slowly (like the membrane potential during a spike!). LSODA is often very efficient and stable for these kinds of systems.
                     - 'BDF' and 'Radau': Other excellent methods for stiff problems.
+            events (bool): Whether to use event detection for spikes. Only applicable if 'method' is specified.
             ret (list(str) or str or None): Specifies what to return.
                 If a list of strings, returns a list of lists, where each inner list corresponds to
                 the requested attribute for all output neurons.
@@ -295,6 +346,8 @@ class IZNN(object):
         """
         if method not in ['RK45', 'RK23', 'DOP853', 'LSODA', 'BDF', 'Radau']:
             raise ValueError(f"Invalid integration method '{method}'. Valid methods are 'RK45', 'RK23', 'DOP853', 'LSODA', 'BDF', 'Radau'.")
+        if method is None and events:
+            raise ValueError("Event detection requires a valid integration method.")
 
         for n in self.neurons.values():
             n.current = n.bias
@@ -314,6 +367,8 @@ class IZNN(object):
         for n in self.neurons.values():
             if method is None:
                 n.advance_rk4(dt_msec)
+            elif events:
+                n.advance_scipy_events(dt_msec, method=method)
             else:
                 n.advance_scipy(dt_msec, method=method)
         self.time_ms += dt_msec
