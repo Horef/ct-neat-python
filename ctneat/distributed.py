@@ -167,37 +167,57 @@ class _EvaluatorSyncManager(managers.BaseManager):
             """
             pass
 
+# Create single, module-level instances of the shared objects.
+_secondary_state = multiprocessing.managers.Value(int, _STATE_RUNNING)
+_inqueue = queue.Queue()
+_outqueue = queue.Queue()
+_namespace = Namespace()
+
+# Define standard, picklable functions to access the shared objects.
+def get_state():
+    return _secondary_state
+
+def set_state(value):
+    _secondary_state.set(value)
+
+def get_inqueue():
+    return _inqueue
+
+def get_outqueue():
+    return _outqueue
+
+def get_namespace():
+    return _namespace
+
+# Register the methods using the named functions.
+_EvaluatorSyncManager.register("get_state", callable=get_state)
+_EvaluatorSyncManager.register("set_state", callable=set_state)
+_EvaluatorSyncManager.register("get_inqueue", callable=get_inqueue)
+_EvaluatorSyncManager.register("get_outqueue", callable=get_outqueue)
+_EvaluatorSyncManager.register("get_namespace", callable=get_namespace)
+
+
 class _ExtendedManager(object):
     """A class for managing the multiprocessing.managers.SyncManager"""
-    __safe_for_unpickling__ = True  # this may not be safe for unpickling,
-
-    # but this is required by pickle.
+    __safe_for_unpickling__ = True
 
     def __init__(self, addr, authkey, mode, start=False):
         self.addr = addr
         self.authkey = authkey
         self.mode = _determine_mode(addr, mode)
         self.manager = None
-        self._secondary_state = multiprocessing.managers.Value(int, _STATE_RUNNING)
         if start:
             self.start()
 
     def __reduce__(self):
-        """
-        This method is used by pickle to serialize instances of this class.
-        """
-        return (
-            self.__class__,
-            (self.addr, self.authkey, self.mode, True),
-        )
+        return (self.__class__, (self.addr, self.authkey, self.mode, True))
 
     def start(self):
         """Starts or connects to the manager."""
         if self.mode == MODE_PRIMARY:
-            i = self._start()
+            self.manager = self._start()
         else:
-            i = self._connect()
-        self.manager = i
+            self.manager = self._connect()
 
     def stop(self):
         """Stops the manager."""
@@ -208,78 +228,22 @@ class _ExtendedManager(object):
         if value not in (_STATE_RUNNING, _STATE_SHUTDOWN, _STATE_FORCED_SHUTDOWN):
             raise ValueError(
                 f"State {value!r} is invalid - needs to be one of _STATE_RUNNING, _STATE_SHUTDOWN, or _STATE_FORCED_SHUTDOWN")
-
         if self.manager is None:
             raise RuntimeError("Manager not started")
         self.manager.set_state(value)
 
-    def _get_secondary_state(self):
-        """
-        Returns the value for 'secondary_state'.
-        This is required for the manager.
-        """
-        return self._secondary_state
-
-    def _get_manager_class(self, register_callables=False):
-        """
-        Returns a new 'Manager' subclass with registered methods.
-        If 'register_callable' is True, defines the 'callable' arguments.
-        """
-
-        inqueue = queue.Queue()
-        outqueue = queue.Queue()
-        namespace = Namespace()
-
-        if register_callables:
-            _EvaluatorSyncManager.register(
-                "get_inqueue",
-                callable=lambda: inqueue,
-            )
-            _EvaluatorSyncManager.register(
-                "get_outqueue",
-                callable=lambda: outqueue,
-            )
-            _EvaluatorSyncManager.register(
-                "get_state",
-                callable=self._get_secondary_state,
-            )
-            _EvaluatorSyncManager.register(
-                "set_state",
-                callable=lambda v: self._secondary_state.set(v),
-            )
-            _EvaluatorSyncManager.register(
-                "get_namespace",
-                callable=lambda: namespace,
-            )
-        else:
-            _EvaluatorSyncManager.register(
-                "get_inqueue",
-            )
-            _EvaluatorSyncManager.register(
-                "get_outqueue",
-            )
-            _EvaluatorSyncManager.register(
-                "get_state",
-            )
-            _EvaluatorSyncManager.register(
-                "set_state",
-            )
-            _EvaluatorSyncManager.register(
-                "get_namespace",
-            )
-        return _EvaluatorSyncManager
+    # 4. The _get_manager_class method is no longer needed.
+    # We directly instantiate the now-configured _EvaluatorSyncManager.
 
     def _connect(self):
         """Connects to the manager."""
-        cls = self._get_manager_class(register_callables=False)
-        ins = cls(address=self.addr, authkey=self.authkey)
+        ins = _EvaluatorSyncManager(address=self.addr, authkey=self.authkey)
         ins.connect()
         return ins
 
     def _start(self):
         """Starts the manager."""
-        cls = self._get_manager_class(register_callables=True)
-        ins = cls(address=self.addr, authkey=self.authkey)
+        ins = _EvaluatorSyncManager(address=self.addr, authkey=self.authkey)
         ins.start()
         return ins
 
