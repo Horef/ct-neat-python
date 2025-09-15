@@ -293,7 +293,7 @@ class IZNeuron(object):
 
 class IZNN(object):
     """Basic iznn network object."""
-    def __init__(self, neurons: Dict[int, IZNeuron], inputs: List[int], outputs: List[int]):
+    def __init__(self, neurons: Dict[int, IZNeuron], inputs: List[int], outputs: List[int], event_driven: bool = False):
         """
         Initializes the IZNN with the given neurons, inputs, and outputs.
 
@@ -301,12 +301,14 @@ class IZNN(object):
             neurons (dict): A dictionary mapping neuron IDs to IZNeuron instances.
             inputs (list): A list of input neuron IDs.
             outputs (list): A list of output neuron IDs.
+            event_driven (bool): If True, uses event-driven simulation for spike timing.
         """
         self.neurons = neurons
         self.inputs = inputs
         self.outputs = outputs
         self.input_values = {}
         self.time_ms = 0.0
+        self.event_driven = event_driven
 
     def set_inputs(self, inputs: List[float]):
         """
@@ -336,7 +338,43 @@ class IZNN(object):
         """
         return 0.05
 
-    def advance(self, dt_msec, method: Optional[str] = 'LSODA', events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
+    def advance(self, dt_msec: float, method: Optional[str] = 'LSODA', events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
+        """
+        Advances the simulation by the given time step in milliseconds.)
+        Args:
+            dt_msec (float): The time step in milliseconds.
+            method (str): The integration method to use. If None, uses manually written RK4, otherwise defaults to SciPy's LSODA.
+                If specified, uses SciPy's solve_ivp with the given method.
+                Valid methods are listed in the SciPy documentation for solve_ivp
+                (https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html).
+                And here is a summary of available methods:
+                    - 'RK45' (Default): An adaptive Runge-Kutta method of order 5(4). It's a great general-purpose choice and a good starting point.
+                    - 'RK23': A lower-order adaptive Runge-Kutta method. Faster but less accurate than RK45.
+                    - 'DOP853': A high-order (8th) adaptive Runge-Kutta method for when you need very high precision.
+                    - 'LSODA': This is a particularly important one for spiking neurons. It's a solver that automatically switches between methods for non-stiff and stiff problems. A "stiff" ODE is one where some parts of the solution change very rapidly while others change slowly (like the membrane potential during a spike!). LSODA is often very efficient and stable for these kinds of systems.
+                    - 'BDF' and 'Radau': Other excellent methods for stiff problems.
+            events (bool): Whether to use event detection for spikes. Only applicable if 'method' is specified.
+            ret (list(str) or str or None): Specifies what to return.
+                If a list of strings, returns a list of lists, where each inner list corresponds to
+                the requested attribute for all output neurons.
+                If a single string, returns a list corresponding to the requested attribute for all output neurons.
+                If None, returns a list of firing states for all output neurons.
+                Valid strings are:
+                    'fired' - returns the firing states (1.0 if fired, 0.0 otherwise)
+                    'voltages' - returns the membrane potentials (in millivolts)
+                    'recovery' - returns the recovery variables
+                    'all' - returns a list of lists: [fired states, voltages, recovery variables]
+        Returns:
+            A list or a list of lists as specified by the 'ret' parameter.
+        Raises:
+            ValueError: If an invalid integration method is specified.
+        """
+        if self.event_driven:
+            return self.advance_event_driven(dt_msec, method=method or 'LSODA', ret=ret)
+        else:
+            return self.advance_simple(dt_msec, method=method, events=events, ret=ret)
+
+    def advance_simple(self, dt_msec, method: Optional[str] = 'LSODA', events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """
         Advances the simulation by the given time step in milliseconds.
         Args:
