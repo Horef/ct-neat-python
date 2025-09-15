@@ -341,7 +341,7 @@ class IZNN(object):
         Advances the simulation by the given time step in milliseconds.
         Args:
             dt_msec (float): The time step in milliseconds.
-            method (str): The integration method to use. If not specified, defaults to manually written RK4.
+            method (str): The integration method to use. If None, uses manually written RK4, otherwise defaults to SciPy's LSODA.
                 If specified, uses SciPy's solve_ivp with the given method.
                 Valid methods are listed in the SciPy documentation for solve_ivp
                 (https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html).
@@ -383,7 +383,7 @@ class IZNN(object):
                 if ineuron is not None:
                     ivalue = ineuron.fired
                 else:
-                    ivalue = self.input_values[i]
+                    ivalue = self.input_values.get(i, 0.0)
 
                 n.current += ivalue * w
 
@@ -409,49 +409,115 @@ class IZNN(object):
         else:
             return out_neurons_firing
 
-    def advance_event_driven(self, dt_msec: float):
+    def advance_event_driven(self, dt_msec: float, method: str = 'LSODA', ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """
-        Advances the simulation using a true event-driven approach with a global clock.
+        Advances the simulation by at most dt_msec using a true event-driven approach.
+
+        The simulation advances to the time of the earliest spike event in the network,
+        or by the full dt_msec if no spikes occur in that interval. This ensures that
+        spike timing is captured with high precision.
+
+        Args:
+            dt_msec (float): The maximum time step to advance in milliseconds.
+            method (str): The integration method to use. If None, uses manually written RK4, otherwise defaults to SciPy's LSODA.
+                If specified, uses SciPy's solve_ivp with the given method.
+                Valid methods are listed in the SciPy documentation for solve_ivp
+                (https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html).
+                And here is a summary of available methods:
+                    - 'RK45' (Default): An adaptive Runge-Kutta method of order 5(4). It's a great general-purpose choice and a good starting point.
+                    - 'RK23': A lower-order adaptive Runge-Kutta method. Faster but less accurate than RK45.
+                    - 'DOP853': A high-order (8th) adaptive Runge-Kutta method for when you need very high precision.
+                    - 'LSODA': This is a particularly important one for spiking neurons. It's a solver that automatically switches between methods for non-stiff and stiff problems. A "stiff" ODE is one where some parts of the solution change very rapidly while others change slowly (like the membrane potential during a spike!). LSODA is often very efficient and stable for these kinds of systems.
+                    - 'BDF' and 'Radau': Other excellent methods for stiff problems.
+            ret (list(str) or str or None): Specifies what to return.
+                If a list of strings, returns a list of lists, where each inner list corresponds to
+                the requested attribute for all output neurons.
+                If a single string, returns a list corresponding to the requested attribute for all output neurons.
+                If None, returns a list of firing states for all output neurons.
+                Valid strings are:
+                    'fired' - returns the firing states (1.0 if fired, 0.0 otherwise)
+                    'voltages' - returns the membrane potentials (in millivolts)
+                    'recovery' - returns the recovery variables
+                    'all' - returns a list of lists: [fired states, voltages, recovery variables]
+        
+        Returns:
+            A list or a list of lists as specified by the 'ret' parameter, representing
+            the state of the output neurons after the time step.
+        Raises:
+            ValueError: If an invalid integration method is specified.
         """
+        if method not in ['RK45', 'RK23', 'DOP853', 'LSODA', 'BDF', 'Radau']:
+            raise ValueError(f"Invalid integration method '{method}'. Valid methods are 'RK45', 'RK23', 'DOP853', 'LSODA', 'BDF', 'Radau'.")
+
+        # Calculate input currents for all neurons based on the current state.
+        for n in self.neurons.values():
+            n.current = n.bias
+            for i, w in n.inputs:
+                ineuron = self.neurons.get(i)
+                if ineuron is not None:
+                    # Input from another neuron is based on its 'fired' state from the previous step.
+                    ivalue = ineuron.fired
+                else:
+                    # Input from an external source.
+                    ivalue = self.input_values.get(i, 0.0)
+
+                n.current += ivalue * w
+
+        # Poll all neurons to get their solutions and potential spike times.
+        # This step does NOT change the state of any neuron.
         solutions = {}
         event_times = {}
-
-        # Poll all neurons for their solutions and next spike times
         for nid, n in self.neurons.items():
-            # You would also update n.current here based on any delivered spikes
-            sol, spike_time = n.solve_for_interval(dt_msec)
+            sol, spike_time = n.solve_for_interval(dt_msec, method=method)
             if sol:
                 solutions[nid] = sol
                 if spike_time is not None:
                     event_times[nid] = spike_time
         
-        # Find the earliest event time in the network
+        # Determine the actual time to advance the simulation.
+        # This is the time of the earliest spike, or the full dt_msec if no spikes occur.
         if not event_times:
-            min_event_time = dt_msec
+            time_to_advance = dt_msec
         else:
             min_event_time = min(event_times.values())
+            time_to_advance = min(min_event_time, dt_msec)
 
-        # If the earliest event is later than our step, just step fully.
-        time_to_advance = min(min_event_time, dt_msec)
-
-        # Update all neuron states to the new global time
+        # Update all neuron states to the new global time.
+        # We use the 'dense_output' from the solution to find the precise state at 'time_to_advance'.
         for nid, n in self.neurons.items():
             if nid in solutions:
-                # Use the dense_output to get the state at the precise time
                 new_state = solutions[nid].sol(time_to_advance)
                 n.v, n.u = new_state
-                n.fired = 0.0
+            # Reset the 'fired' flag for all neurons before processing the new spikes.
+            n.fired = 0.0
 
-        # Reset the neurons that fired at this exact moment
+        # Process the spike(s): reset the neuron(s) that fired at this exact moment.
         for nid, t in event_times.items():
-            if abs(t - time_to_advance) < 1e-9: # Compare with tolerance
+            # Use a small tolerance for floating point comparison.
+            if abs(t - time_to_advance) < 1e-9: 
                 n = self.neurons[nid]
                 n.fired = 1.0
                 n.v = n.c
                 n.u += n.d
+                # FUTURE TODO: This is where you would add the spike to a delivery
+                # queue if implementing axonal propagation delays.
 
-        # Advance the global clock
+        # Advance the global clock.
         self.time_ms += time_to_advance
+
+        # Return the requested output values, consistent with the other advance method.
+        out_neurons_firing = [self.neurons[i].fired for i in self.outputs]
+        out_neurons_voltages = [self.neurons[i].v for i in self.outputs]
+        out_neurons_recovery = [self.neurons[i].u for i in self.outputs]
+        ret_keys = {'fired': out_neurons_firing, 'voltages': out_neurons_voltages, 'recovery': out_neurons_recovery}
+        if isinstance(ret, list):
+            return [ret_keys[k] for k in ret if k in ret_keys]
+        elif isinstance(ret, str):
+            if ret == 'all':
+                return [out_neurons_firing, out_neurons_voltages, out_neurons_recovery]
+            return ret_keys.get(ret, [])
+        else:
+            return out_neurons_firing
 
     @staticmethod
     def create(genome, config):

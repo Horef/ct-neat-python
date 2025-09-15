@@ -29,7 +29,7 @@ net.set_inputs([init0])
 times = [0.0]
 outputs = [[n1.fired, n2.fired]]
 for i in range(200):
-    output = net.advance(0.05, method='LSODA', ret='voltages', events=True)
+    output = net.advance_event_driven(0.05, ret='voltages')
     times.append(net.time_ms)
     outputs.append(output)
     
