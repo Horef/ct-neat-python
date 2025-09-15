@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='ct-neat-python',
-    version='0.1',
+    version='1.0.0',
     author='Sergiy Horef',
     author_email='s@unzim.com',
     maintainer='Sergiy Horef',
@@ -15,13 +15,12 @@ setup(
                      'with Continuous Time dynamics.',
     long_description_content_type= 'text/x-rst',
     packages=find_packages(),
-    install_requires=['joblib'],
+    install_requires=['numpy', 'scipy', 'joblib'],
     classifiers=[
         'Development Status :: 1 - Beta',
         'Intended Audience :: Developers',
         'Intended Audience :: Education',
         'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
@@ -29,6 +28,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Topic :: Scientific/Engineering'
     ]
