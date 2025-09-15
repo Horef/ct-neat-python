@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='ct-neat-python',
@@ -14,7 +14,8 @@ setup(
                      'developed by Kenneth O. Stanley for evolving arbitrary neural networks.' +
                      'with Continuous Time dynamics.',
     long_description_content_type= 'text/x-rst',
-    packages=['neat', 'neat/iznn', 'neat/nn', 'neat/ctrnn'],
+    packages=find_packages(),
+    install_requires=['joblib'],
     classifiers=[
         'Development Status :: 1 - Beta',
         'Intended Audience :: Developers',

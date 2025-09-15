@@ -45,21 +45,21 @@ class IZNodeGene(BaseGene):
                         FloatAttribute('c'),
                         FloatAttribute('d')]
 
-    @property
-    def a(self):
-        return self.__getattribute__('a')
+    # @property
+    # def a(self):
+    #     return self.__getattribute__('a')
 
-    @property
-    def b(self):
-        return self.__getattribute__('b')
+    # @property
+    # def b(self):
+    #     return self.__getattribute__('b')
 
-    @property
-    def c(self):
-        return self.__getattribute__('c')
+    # @property
+    # def c(self):
+    #     return self.__getattribute__('c')
 
-    @property
-    def d(self):
-        return self.__getattribute__('d')
+    # @property
+    # def d(self):
+    #     return self.__getattribute__('d')
 
     def distance(self, other, config):
         s = abs(self.a - other.a) + abs(self.b - other.b) \
@@ -146,6 +146,14 @@ class IZNeuron(object):
         du_dt = self.a * (self.b * v - u)
         return [dv_dt, du_dt]
 
+    def advance(self, dt_msec: float):
+        """
+        This is a default advance method which is simply a wrapper to the advance_scipy method.
+        Args:
+            dt_msec (float): The time step in milliseconds.
+        """
+        self.advance_scipy(dt_msec)
+
     def advance_rk4(self, dt_msec: float):
         """
         Advances simulation time using 4th-Order Runge-Kutta.
@@ -187,7 +195,7 @@ class IZNeuron(object):
             self.v = self.c
             self.u = self.b * self.v
 
-    def advance_scipy(self, dt_msec: float, method: str = 'RK45'):
+    def advance_scipy(self, dt_msec: float, method: str = 'LSODA'):
         """
         Advances simulation time using a solver from SciPy.
         
@@ -224,7 +232,7 @@ class IZNeuron(object):
             self.v = self.c
             self.u = self.b * self.v
 
-    def advance_scipy_events(self, dt_msec: float, method: str = 'RK45'):
+    def advance_scipy_events(self, dt_msec: float, method: str = 'LSODA'):
         """
         Advances the simulation using SciPy's solve_ivp with event detection.
         This method detects spikes (when v crosses 30mV) during the integration step.

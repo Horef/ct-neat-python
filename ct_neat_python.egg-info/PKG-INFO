@@ -1,0 +1,41 @@
+Metadata-Version: 2.4
+Name: ct-neat-python
+Version: 0.1
+Summary: A CT (Continuous Time) NEAT (NeuroEvolution of Augmenting Topologies) implementation
+Home-page: https://github.com/Horef/ct-neat-python
+Author: Sergiy Horef
+Author-email: s@unzim.com
+Maintainer: Sergiy Horef
+Maintainer-email: s@unzim.com
+License: BSD
+Classifier: Development Status :: 1 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Education
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Topic :: Scientific/Engineering
+Description-Content-Type: text/x-rst
+License-File: LICENSE
+Requires-Dist: joblib
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: maintainer
+Dynamic: maintainer-email
+Dynamic: requires-dist
+Dynamic: summary
+
+Python implementation of NEAT (NeuroEvolution of Augmenting Topologies), a method developed by Kenneth O. Stanley for evolving arbitrary neural networks.with Continuous Time dynamics.

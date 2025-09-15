@@ -159,6 +159,13 @@ def chunked(data, chunksize):
         res.append(cur)
     return res
 
+class _EvaluatorSyncManager(managers.BaseManager):
+            """
+            A custom BaseManager.
+            Please see the documentation of `multiprocessing` for more
+            information.
+            """
+            pass
 
 class _ExtendedManager(object):
     """A class for managing the multiprocessing.managers.SyncManager"""
@@ -218,14 +225,6 @@ class _ExtendedManager(object):
         Returns a new 'Manager' subclass with registered methods.
         If 'register_callable' is True, defines the 'callable' arguments.
         """
-
-        class _EvaluatorSyncManager(managers.BaseManager):
-            """
-            A custom BaseManager.
-            Please see the documentation of `multiprocessing` for more
-            information.
-            """
-            pass
 
         inqueue = queue.Queue()
         outqueue = queue.Queue()
