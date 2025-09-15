@@ -261,6 +261,29 @@ class IZNeuron(object):
             self.v = self.c
             self.u = self.b * self.v
 
+    def solve_for_interval(self, dt_msec: float, method: str = 'LSODA'):
+        """
+        Solves the neuron's ODE for a given interval and reports the solution
+        and any spike events. This method DOES NOT change the neuron's state.
+        """
+        if self.v >= 30.0: # Already in a spiked state from a previous step
+            return None, 0.0 # Spike at the very beginning of the interval
+
+        y0 = [self.v, self.u]
+        t_span = [0, dt_msec]
+        sol = solve_ivp(
+            fun=self._derivatives_scipy,
+            t_span=t_span,
+            y0=y0,
+            method=method,
+            events=self._spike_event,
+            dense_output=True # Needed to evaluate the solution at any time
+        )
+        
+        spike_time = sol.t_events[0][0] if sol.t_events[0].size > 0 else None
+        return sol, spike_time
+
+
     def reset(self):
         """Resets all state variables."""
         self.v = self.c
@@ -313,7 +336,7 @@ class IZNN(object):
         """
         return 0.05
 
-    def advance(self, dt_msec, method: Optional[str] = None, events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
+    def advance(self, dt_msec, method: Optional[str] = 'LSODA', events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """
         Advances the simulation by the given time step in milliseconds.
         Args:
@@ -385,6 +408,50 @@ class IZNN(object):
             return ret_keys.get(ret, [])
         else:
             return out_neurons_firing
+
+    def advance_event_driven(self, dt_msec: float):
+        """
+        Advances the simulation using a true event-driven approach with a global clock.
+        """
+        solutions = {}
+        event_times = {}
+
+        # Poll all neurons for their solutions and next spike times
+        for nid, n in self.neurons.items():
+            # You would also update n.current here based on any delivered spikes
+            sol, spike_time = n.solve_for_interval(dt_msec)
+            if sol:
+                solutions[nid] = sol
+                if spike_time is not None:
+                    event_times[nid] = spike_time
+        
+        # Find the earliest event time in the network
+        if not event_times:
+            min_event_time = dt_msec
+        else:
+            min_event_time = min(event_times.values())
+
+        # If the earliest event is later than our step, just step fully.
+        time_to_advance = min(min_event_time, dt_msec)
+
+        # Update all neuron states to the new global time
+        for nid, n in self.neurons.items():
+            if nid in solutions:
+                # Use the dense_output to get the state at the precise time
+                new_state = solutions[nid].sol(time_to_advance)
+                n.v, n.u = new_state
+                n.fired = 0.0
+
+        # Reset the neurons that fired at this exact moment
+        for nid, t in event_times.items():
+            if abs(t - time_to_advance) < 1e-9: # Compare with tolerance
+                n = self.neurons[nid]
+                n.fired = 1.0
+                n.v = n.c
+                n.u += n.d
+
+        # Advance the global clock
+        self.time_ms += time_to_advance
 
     @staticmethod
     def create(genome, config):

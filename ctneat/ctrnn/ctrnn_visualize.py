@@ -31,7 +31,7 @@ def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = Fa
         for input_node_id, weight in inputs:
             dot.edge(str(input_node_id), str(node_id), label=str(weight))
 
-    dot.render(file_name or 'ctrnn_network', format='png', cleanup=True, directory=dir_name or '.')
+    dot.render(file_name or 'iznn_network' if iznn else 'ctrnn_network', format='png', cleanup=True, directory=dir_name or '.')
 
 def draw_ctrnn_dynamics(states: np.ndarray, iznn: Optional[bool] = False, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
@@ -59,13 +59,13 @@ def draw_ctrnn_dynamics(states: np.ndarray, iznn: Optional[bool] = False, save: 
 
     plt.legend(loc="best")
     if save:
-        plt.savefig(f"{dir_name + '/' if dir_name else ''}{file_name or 'ctrnn_dynamics'}.png")
+        plt.savefig(f"{dir_name + '/' if dir_name else ''}{file_name or 'iznn_dynamics' if iznn else 'ctrnn_dynamics'}.png")
     if show:
         plt.show()
 
-def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2, iznn: Optional[bool] = False, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
+def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optional[bool] = False, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
-    This function draws a face portrait of the CTRNN's state space.
+    This function draws a trajectory of the CTRNN's state space.
     If there are more than 'n_components' nodes, the PCA is used to reduce the dimensionality to 'n_components'.
     Args:
         states: A 2D numpy array where each column corresponds to the state of the network at a given time step,
@@ -92,7 +92,7 @@ def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2, iznn: Op
 
     if n_components == 1:
         plt.figure(figsize=(10,5))
-        plt.title(f"{'IZNN' if iznn else 'CTRNN'} Face Portrait ({n_components}D)")
+        plt.title(f"{'IZNN' if iznn else 'CTRNN'} Trajectory ({n_components}D)")
         plt.xlabel("Time")
         plt.ylabel("Principal Component 1")
         plt.grid()
@@ -104,7 +104,7 @@ def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2, iznn: Op
 
     elif n_components == 2:
         plt.figure(figsize=(10,10))
-        plt.title(f"{'IZNN' if iznn else 'CTRNN'} Face Portrait ({n_components}D)")
+        plt.title(f"{'IZNN' if iznn else 'CTRNN'} Trajectory ({n_components}D)")
         plt.xlabel("Principal Component 1")
         plt.ylabel("Principal Component 2")
         plt.grid()
@@ -119,7 +119,7 @@ def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2, iznn: Op
         ax = plt.axes(projection='3d')
         ax.grid()
 
-        ax.set_title(f"{'IZNN' if iznn else 'CTRNN'} Face Portrait ({n_components}D)")
+        ax.set_title(f"{'IZNN' if iznn else 'CTRNN'} Trajectory ({n_components}D)")
         ax.set_xlabel("Principal Component 1")
         ax.set_ylabel("Principal Component 2")
         ax.set_zlabel("Principal Component 3")
@@ -130,6 +130,6 @@ def draw_ctrnn_face_portrait(states: np.ndarray, n_components: int = 2, iznn: Op
         ax.text(reduced_states[0][-1], reduced_states[1][-1], reduced_states[2][-1], 'End', fontsize=12, color='red')
 
     if save:
-        plt.savefig(f"{dir_name + '/' if dir_name else ''}{file_name or 'ctrnn_face_portrait'}.png")
+        plt.savefig(f"{dir_name + '/' if dir_name else ''}{file_name or 'iznn_trajectory' if iznn else 'ctrnn_trajectory'}.png")
     if show:
         plt.show()

@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.
 import ctneat
 from ctneat.activations import sigmoid_activation
 
-from ctneat.ctrnn.ctrnn_visualize import draw_ctrnn_net, draw_ctrnn_dynamics, draw_ctrnn_face_portrait
+from ctneat.ctrnn.ctrnn_visualize import draw_ctrnn_net, draw_ctrnn_dynamics, draw_ctrnn_trajectory
 
 # Create a fully-connected network of a few neurons with no external inputs.
 node1_inputs = [(1, -0.1), (2, 0.2), (3, -0.2)]
@@ -43,4 +43,4 @@ outputs = np.array(outputs).T
 
 draw_ctrnn_dynamics(outputs, save=True, show=False)
 
-draw_ctrnn_face_portrait(outputs, n_components=3, save=True, show=False)
+draw_ctrnn_trajectory(outputs, n_components=3, save=True, show=False)
