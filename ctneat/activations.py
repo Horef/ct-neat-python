@@ -6,6 +6,7 @@ and code for adding new user-defined ones
 
 import math
 import types
+import inspect
 
 
 def sigmoid_activation(z):
@@ -98,7 +99,6 @@ def cube_activation(z):
 class InvalidActivationFunction(TypeError):
     pass
 
-
 def validate_activation(function):
     if not isinstance(function,
                       (types.BuiltinFunctionType,
@@ -106,7 +106,8 @@ def validate_activation(function):
                        types.LambdaType)):
         raise InvalidActivationFunction("A function object is required.")
 
-    if function.__code__.co_argcount != 1:  # avoid deprecated use of `inspect`
+    sig = inspect.signature(function)
+    if len(sig.parameters) != 1:
         raise InvalidActivationFunction("A single-argument function is required.")
 
 
