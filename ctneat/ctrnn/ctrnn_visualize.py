@@ -37,8 +37,8 @@ def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Op
     """
     This function draws the dynamics of the CTRNN over time.
     Args:
-        states: A 2D numpy array where each column corresponds to the state of the network at a given time step,
-        and each row corresponds to a specific node's state.
+        states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
+        and each column corresponds to a specific node's state.
         iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         save: Whether to save the plot as a file. If False, the plot is shown interactively.
         show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.
@@ -48,9 +48,9 @@ def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Op
         None
     """
     if uniform_time:
-        times = np.arange(states.shape[1])
+        times = np.arange(states.shape[0])
     else:
-        if times is None or len(times) != states.shape[1]:
+        if times is None or len(times) != states.shape[0]:
             raise ValueError("Invalid times array. Must be provided and match the number of time steps in states.")
 
     plt.figure()
@@ -59,8 +59,8 @@ def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Op
     plt.ylabel("Output")
     plt.grid()
 
-    for i in range(states.shape[0]):
-        plt.plot(times, states[i], label=f"Node {i+1}")
+    for i in range(states.shape[1]):
+        plt.plot(times, states[:, i], label=f"Node {i+1}")
 
     plt.legend(loc="best")
     if save:
@@ -73,8 +73,8 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
     This function draws a trajectory of the CTRNN's state space.
     If there are more than 'n_components' nodes, the PCA is used to reduce the dimensionality to 'n_components'.
     Args:
-        states: A 2D numpy array where each column corresponds to the state of the network at a given time step,
-        and each row corresponds to a specific node's state.
+        states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
+        and each column corresponds to a specific node's state.
         n_components: The number of components to reduce to (default is 2, max is 3).
         iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         save: Whether to save the plot as a file. If False, the plot is shown interactively.
@@ -89,7 +89,7 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
     if n_components < 1 or n_components > 3:
         raise ValueError("Invalid number of components. Must be 1, 2, or 3.")
 
-    if states.shape[0] > n_components:
+    if states.shape[1] > n_components:
         pca = PCA(n_components=n_components)
         reduced_states = pca.fit_transform(states)
     else:
@@ -102,10 +102,10 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
         plt.ylabel("Principal Component 1")
         plt.grid()
 
-        plt.plot(range(reduced_states.shape[0]), reduced_states[0], color='b', marker='o', markersize=3)
+        plt.plot(range(reduced_states.shape[1]), reduced_states[:, 0], color='b', marker='o', markersize=3)
         # denoting the start and end points
-        plt.text(range(reduced_states.shape[0])[0], reduced_states[0][0], 'Start', fontsize=12, color='green')
-        plt.text(range(reduced_states.shape[0])[-1], reduced_states[0][-1], 'End', fontsize=12, color='red')
+        plt.text(range(reduced_states.shape[1])[0], reduced_states[0][0], 'Start', fontsize=12, color='green')
+        plt.text(range(reduced_states.shape[1])[-1], reduced_states[-1][0], 'End', fontsize=12, color='red')
 
     elif n_components == 2:
         plt.figure(figsize=(10,10))
@@ -114,10 +114,10 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
         plt.ylabel("Principal Component 2")
         plt.grid()
 
-        plt.plot(reduced_states[0], reduced_states[1], color='b', marker='o', markersize=3)
+        plt.plot(reduced_states[:, 0], reduced_states[:, 1], color='b', marker='o', markersize=3)
         # denoting the start and end points
-        plt.text(reduced_states[0][0], reduced_states[1][0], 'Start', fontsize=12, color='green')
-        plt.text(reduced_states[0][-1], reduced_states[1][-1], 'End', fontsize=12, color='red')
+        plt.text(reduced_states[0][0], reduced_states[0][1], 'Start', fontsize=12, color='green')
+        plt.text(reduced_states[-1][0], reduced_states[-1][1], 'End', fontsize=12, color='red')
 
     elif n_components == 3:
         plt.figure(figsize=(10,10))
@@ -129,10 +129,10 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
         ax.set_ylabel("Principal Component 2")
         ax.set_zlabel("Principal Component 3")
 
-        ax.plot3D(reduced_states[0], reduced_states[1], reduced_states[2], color='b', marker='o', markersize=3)
+        ax.plot3D(reduced_states[:, 0], reduced_states[:, 1], reduced_states[:, 2], color='b', marker='o', markersize=3)
         # denoting the start and end points
-        ax.text(reduced_states[0][0], reduced_states[1][0], reduced_states[2][0], 'Start', fontsize=12, color='green')
-        ax.text(reduced_states[0][-1], reduced_states[1][-1], reduced_states[2][-1], 'End', fontsize=12, color='red')
+        ax.text(reduced_states[0][0], reduced_states[0][1], reduced_states[0][2], 'Start', fontsize=12, color='green')
+        ax.text(reduced_states[-1][0], reduced_states[-1][1], reduced_states[-1][2], 'End', fontsize=12, color='red')
 
     if save:
         plt.savefig(f"{dir_name + '/' if dir_name else ''}{file_name or 'iznn_trajectory' if iznn else 'ctrnn_trajectory'}.png")
