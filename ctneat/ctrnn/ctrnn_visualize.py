@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import graphviz
 from sklearn.decomposition import PCA
-from typing import Optional
+from typing import Optional, Union
 
 def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = False, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
@@ -33,7 +33,7 @@ def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = Fa
 
     dot.render(file_name or 'iznn_network' if iznn else 'ctrnn_network', format='png', cleanup=True, directory=dir_name or '.')
 
-def draw_ctrnn_dynamics(states: np.ndarray, iznn: Optional[bool] = False, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
+def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Optional[Union[np.ndarray, list]] = None, iznn: Optional[bool] = False, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
     This function draws the dynamics of the CTRNN over time.
     Args:
@@ -47,6 +47,11 @@ def draw_ctrnn_dynamics(states: np.ndarray, iznn: Optional[bool] = False, save: 
     Returns:
         None
     """
+    if uniform_time:
+        times = np.arange(states.shape[1])
+    else:
+        if times is None or len(times) != states.shape[1]:
+            raise ValueError("Invalid times array. Must be provided and match the number of time steps in states.")
 
     plt.figure()
     plt.title(f"{'IZNN' if iznn else 'CTRNN'} Dynamics")
@@ -55,7 +60,7 @@ def draw_ctrnn_dynamics(states: np.ndarray, iznn: Optional[bool] = False, save: 
     plt.grid()
 
     for i in range(states.shape[0]):
-        plt.plot(states[i], label=f"Node {i+1}")
+        plt.plot(times, states[i], label=f"Node {i+1}")
 
     plt.legend(loc="best")
     if save:

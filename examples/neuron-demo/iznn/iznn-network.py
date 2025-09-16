@@ -38,6 +38,6 @@ for i in range(200):
 
 outputs = np.array(outputs).T
 
-draw_ctrnn_dynamics(outputs, iznn=True, save=True, show=False)
+draw_ctrnn_dynamics(outputs, uniform_time=False, times=times, iznn=True, save=True, show=False)
 
 draw_ctrnn_trajectory(outputs, n_components=2, iznn=True, save=True, show=False)
