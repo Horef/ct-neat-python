@@ -92,6 +92,9 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
     if states.shape[1] > n_components:
         pca = PCA(n_components=n_components)
         reduced_states = pca.fit_transform(states)
+    elif states.shape[1] < n_components:
+        reduced_states = states
+        raise RuntimeWarning(f"Cannot reduce to {n_components} components from {states.shape[1]} nodes. Falling back to {states.shape[1]}D.")
     else:
         reduced_states = states
 
