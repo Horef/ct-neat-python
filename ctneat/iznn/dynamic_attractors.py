@@ -65,8 +65,9 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
     Args:
         data_points (np.ndarray): A 2D numpy array where each row corresponds to a time step,
                                   and each column corresponds to a specific variable's state.
-        burn_in (int): Number of initial time steps to discard from the analysis. 
-            If float, treated as percentage. If None, no burn-in is applied (same as if 0).
+        burn_in (Optional[Union[int, float]]): Number of initial time steps to discard from the analysis. 
+            If float, treated as percentage. If int, treated as absolute number of steps. 
+            If None, no burn-in is applied (same as if 0).
         time_delay (int): Time delay for embedding the time series.
             The time delay defines the number of time steps to skip when creating the embedded vectors.
         radius (float): The radius for the recurrence plot. If None, a default value is 0.2 * std(data).
@@ -162,7 +163,8 @@ def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end
     return "-".join(fingerprint)
 
 
-def fingerprint_attractors(fired_history: np.ndarray, voltage_history: np.ndarray, times: np.ndarray) -> Optional[str]:
+def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarray, times: np.ndarray,
+                           burn_in: Optional[Union[int, float]] = None, min_repetitions: int = 3) -> Optional[str]:
     """
     Analyzes the voltage and firing history to identify and characterize attractor periods.
     It estimates the dominant period using FFT (Fast Fourier Transform) and then characterizes the spike pattern
@@ -172,6 +174,9 @@ def fingerprint_attractors(fired_history: np.ndarray, voltage_history: np.ndarra
         fired_history (np.ndarray): A 2D array (time steps x neurons) of firing states (1.0 or 0.0).
         voltage_history (np.ndarray): A 2D array (time steps x neurons) of voltage values.
         times (np.ndarray): A 1D array of time stamps corresponding to the data points.
+        burn_in (Optional[Union[int, float]]): Number of initial time steps to discard from the analysis. 
+            If float, treated as percentage. If int, treated as absolute number of steps. If None, defaults to 0.
+        min_repetitions (int): Minimum number of repetitions of the attractor cycle to confirm its presence.
     Returns:
         Optional[str]: A string representing the spike pattern of the attractor, or None if no attractor is found.
             Neurons that fire at each time step are listed, separated by commas, and time steps are separated by hyphens. 
@@ -184,8 +189,17 @@ def fingerprint_attractors(fired_history: np.ndarray, voltage_history: np.ndarra
     if fired_history.shape[0] != len(times):
         raise ValueError("Length of times must match the number of time steps in fired_history and voltage_history.")
     
+    if burn_in is not None:
+        if isinstance(burn_in, float):
+            burn_in = int(burn_in * times.shape[0])
+        voltage_history = voltage_history[burn_in:, :]
+        fired_history = fired_history[burn_in:, :]
+        times = times[burn_in:]
+    else:
+        burn_in = 0
+
     # Check if time data is uniformly sampled
-    dt = np.diff(fired_history[0, :])
+    dt = np.diff(times)
     if not np.allclose(dt, dt[0]):
         raise ValueError("Data must be uniformly sampled in time.")
     dt = dt[0]
@@ -204,13 +218,13 @@ def fingerprint_attractors(fired_history: np.ndarray, voltage_history: np.ndarra
         # If there is variation, proceed with FFT
         # Compute the frequency spectrum and find the dominant frequency
         fft_vals = np.fft.rfft(signal - np.mean(signal))
-        fft_freq = np.fft.rfftfreq(len(signal), d=dt/1000.0) # converting ms to s
+        fft_freq = np.fft.rfftfreq(len(signal), d=dt) # the frequencies are in kHz if dt is in ms
         dominant_freq_hz = fft_freq[np.argmax(np.abs(fft_vals[1:])) + 1] # Avoid DC component, therefore 1:
         
         if dominant_freq_hz > 0:
             print(f"Found oscillating signal in Neuron {neuron_idx+1}. Using it to estimate period.")
             # Convert frequency to period in ms, where period = 1/frequency
-            period_ms = (1.0 / dominant_freq_hz) * 1000.0
+            period_ms = (1.0 / dominant_freq_hz)
             # Convert period in ms to number of time steps
             period_steps = int(period_ms / dt)
             print(f"Estimated attractor period: {period_ms:.2f} ms ({period_steps} steps)")
@@ -219,10 +233,15 @@ def fingerprint_attractors(fired_history: np.ndarray, voltage_history: np.ndarra
     else:
         print("No oscillating signals found in any neuron. This is a point attractor.")
         return characterize_attractor_spikes(fired_history, 0, 1)
-        
+    
+    # check that estimated_period_steps gives enough data for min_repetitions
+    if estimated_period_steps * min_repetitions > len(times):
+        print(f"Not enough data to cover {min_repetitions} repetitions of the estimated period. Cannot characterize attractor using this period.")
+        return None
+
     # Finding the fingerprint based on the estimated period
     # Characterize the last full period of the simulation
-    end_idx = len(times) - 1
+    end_idx = len(times)
     start_idx = end_idx - estimated_period_steps
     if start_idx < 0:
         print("Not enough data to cover one full period. Cannot characterize attractor.")
@@ -234,8 +253,9 @@ def fingerprint_attractors(fired_history: np.ndarray, voltage_history: np.ndarra
 
 
 def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.ndarray, times_np: np.ndarray, 
-                                burn_in: Optional[Union[int, float]] = None, time_delay: int = 1, 
-                                radius: Optional[float] = None, theiler_corrector: int = 2,
+                                burn_in: Optional[Union[int, float]] = 0.25, variable_burn_in: bool = False,
+                                burn_in_rate: float = 0.5, min_repetitions: int = 3, min_points: int = 100,
+                                time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 2,
                                 det_threshold: float = 0.2, metric: str = 'euclidean', 
                                 printouts: bool = True, verbose: bool = False) -> Optional[str]:
     """
@@ -248,7 +268,15 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
         fired_history (np.ndarray): A 2D numpy array where each row corresponds to a time step,
                                      and each column corresponds to a specific neuron's firing state.
         times_np (np.ndarray): A 1D numpy array of time stamps corresponding to the data points.
-        burn_in (int): Number of initial time steps to discard from the analysis. If float, treated as percentage.
+        burn_in (Optional[Union[int, float]]): Number of initial time steps to discard from the analysis. 
+            If float, treated as percentage. If int, treated as absolute number of steps. If None, defaults to 0.
+        variable_burn_in (bool): If True, adds an option to variably increase the burn-in period in case
+            the one provided in burn_in is not sufficient to find the attractor.
+        burn_in_rate (float): The rate at which to increase the burn-in period if variable_burn_in is True.
+            For example, a rate of 0.5 means increasing that the new burn-in will include 50% of the non-burned-in data.
+            Burn-in will continuously increase until an attractor is found or until not enough data is left.
+        min_repetitions (int): Minimum number of repetitions of the attractor cycle to confirm its presence.
+        min_points (int): Minimum number of data points required after burn-in to perform the analysis.
         time_delay (int): Time delay for embedding the time series.
             The time delay defines the number of time steps to skip when creating the embedded vectors.
         radius (float): The radius for the recurrence plot. If None, a default value is 0.2 * std(data).
@@ -279,15 +307,59 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
     if printouts:
         print(f"Resampled data to uniform time steps.\n"
               f"Original shape: {voltage_history.shape}, New shape: {uniform_voltage_history.shape}, Time step: {uniform_times[1]-uniform_times[0]:.4f} ms")
-    rqa_result = perform_rqa_analysis(uniform_voltage_history, burn_in=burn_in, time_delay=time_delay, radius=radius,
-                                      theiler_corrector=theiler_corrector, metric=metric, printouts=printouts, verbose=verbose)
-    if rqa_result.determinism > det_threshold:
-        fingerprint = fingerprint_attractors(uniform_voltage_history, uniform_fired_history, uniform_times)
-        if printouts:
-            print(f"Significant determinism detected (DET={rqa_result.determinism:.3f}). Attempting to characterize attractors.")
-            print(f"Attractor fingerprint: {fingerprint}")
-        return fingerprint
+    
+    if burn_in is not None:
+        if isinstance(burn_in, float):
+            burn_in = int(burn_in * uniform_times.shape[0])
     else:
+        burn_in = 0
+
+    # Ensure there are enough points after burn-in
+    if (uniform_times.shape[0] - burn_in) < min_points:
         if printouts:
-            print(f"Determinism below threshold (DET={rqa_result.determinism:.3f} < {det_threshold}). Skipping attractor characterization.")
+            print(f"Not enough data points after burn-in ({uniform_times.shape[0] - burn_in} < {min_points}). Cannot perform analysis.")
         return None
+
+    # While the amount of data left after burn-in is sufficient
+    while (uniform_times.shape[0] - burn_in) >= max(min_repetitions * 2, min_points):
+        if variable_burn_in:
+            print(f"Using burn-in of {burn_in} points or {burn_in / uniform_times.shape[0] * 100:.1f}%.")
+        rqa_result = perform_rqa_analysis(uniform_voltage_history, burn_in=burn_in, time_delay=time_delay, radius=radius,
+                                        theiler_corrector=theiler_corrector, metric=metric, printouts=printouts, verbose=verbose)
+        if rqa_result.determinism > det_threshold:
+            fingerprint = fingerprint_attractors(uniform_voltage_history, uniform_fired_history, uniform_times,
+                                                 burn_in=burn_in, min_repetitions=min_repetitions)
+            if printouts:
+                print(f"Significant determinism detected (DET={rqa_result.determinism:.3f}). Attempting to characterize attractors.")
+            
+            if fingerprint is None:
+                if printouts:
+                    print("Could not characterize attractor.")
+            else:
+                if printouts:
+                    print(f"Attractor characterized with fingerprint: {fingerprint}")
+                return fingerprint
+        else:
+            if printouts:
+                print(f"Determinism below threshold (DET={rqa_result.determinism:.3f} < {det_threshold}). Skipping attractor characterization.")
+        
+        if not variable_burn_in:
+            return None
+        else:
+            # if the burn-in is at its maximum (all but min_points), stop
+            if (uniform_times.shape[0] - burn_in) <= min_points:
+                if printouts:
+                    print("Reached maximum burn-in. Not enough data left to continue analysis.")
+                return None
+            # increase the burn-in period and try again
+            new_burn_in = burn_in + int(burn_in_rate * (uniform_times.shape[0] - burn_in))
+            if new_burn_in == burn_in:
+                new_burn_in += 1
+            # ensure we leave at least min_points points
+            if (uniform_times.shape[0] - new_burn_in) < min_points:
+                new_burn_in = uniform_times.shape[0] - min_points
+                if printouts:
+                    print(f"Adjusting burn-in to leave at least {min_points} points.")
+            burn_in = new_burn_in
+            if printouts:
+                print(f"Increasing burn-in to {burn_in} points or {burn_in / uniform_times.shape[0] * 100:.1f}% and trying again.")

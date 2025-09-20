@@ -46,9 +46,10 @@ with open("iznn-demo-voltage_history.npy", "wb") as f:
 with open("iznn-demo-fired_history.npy", "wb") as f:
     np.save(f, fired_history)
 
-draw_ctrnn_dynamics(voltage_history, uniform_time=False, times=times, iznn=True, save=True, show=False)
+#draw_ctrnn_dynamics(voltage_history, uniform_time=False, times=times, iznn=True, save=True, show=False)
 
-draw_ctrnn_trajectory(voltage_history, n_components=2, iznn=True, save=True, show=False)
+#draw_ctrnn_trajectory(voltage_history, n_components=2, iznn=True, save=True, show=False)
 
-dynamic_attractors_pipeline(voltage_history=voltage_history, fired_history=fired_history, times_np=np.array(times))
+dynamic_attractors_pipeline(voltage_history=voltage_history, fired_history=fired_history, times_np=np.array(times),
+                            variable_burn_in=True)
 
