@@ -9,6 +9,7 @@ from pyrqa.computation import RQAComputation
 from pyrqa.computation import RPComputation
 from pyrqa.image_generator import ImageGenerator
 import numpy as np
+from sklearn.decomposition import PCA
 
 
 def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Optional[Union[float, str]] = None) -> Tuple[np.ndarray, np.ndarray]:
@@ -164,7 +165,8 @@ def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end
 
 
 def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarray, times: np.ndarray,
-                           burn_in: Optional[Union[int, float]] = None, min_repetitions: int = 3) -> Optional[str]:
+                           burn_in: Optional[Union[int, float]] = None, min_repetitions: int = 3,
+                           printouts: bool = False) -> Optional[str]:
     """
     Analyzes the voltage and firing history to identify and characterize attractor periods.
     It estimates the dominant period using FFT (Fast Fourier Transform) and then characterizes the spike pattern
@@ -177,6 +179,7 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         burn_in (Optional[Union[int, float]]): Number of initial time steps to discard from the analysis. 
             If float, treated as percentage. If int, treated as absolute number of steps. If None, defaults to 0.
         min_repetitions (int): Minimum number of repetitions of the attractor cycle to confirm its presence.
+        printouts (bool): Whether to print summarized analysis information.
     Returns:
         Optional[str]: A string representing the spike pattern of the attractor, or None if no attractor is found.
             Neurons that fire at each time step are listed, separated by commas, and time steps are separated by hyphens. 
@@ -205,44 +208,52 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
     dt = dt[0]
 
     num_neurons = fired_history.shape[1]
-
-    estimated_period_steps = None
-    for neuron_idx in range(num_neurons):
-        signal = voltage_history[:, neuron_idx]
-
-        # Check is the signal has meaningful variation
-        if np.std(signal) < 0.1: # Threshold for a "flat" signal in mV
-            print(f"Neuron {neuron_idx+1} has a flat signal. Skipping.")
-            continue
-
-        # If there is variation, proceed with FFT
-        # Compute the frequency spectrum and find the dominant frequency
-        fft_vals = np.fft.rfft(signal - np.mean(signal))
-        fft_freq = np.fft.rfftfreq(len(signal), d=dt) # the frequencies are in kHz if dt is in ms
-        dominant_freq_hz = fft_freq[np.argmax(np.abs(fft_vals[1:])) + 1] # Avoid DC component, therefore 1:
-        
-        if dominant_freq_hz > 0:
-            print(f"Found oscillating signal in Neuron {neuron_idx+1}. Using it to estimate period.")
-            # Convert frequency to period in ms, where period = 1/frequency
-            period_ms = (1.0 / dominant_freq_hz)
-            # Convert period in ms to number of time steps
-            period_steps = int(period_ms / dt)
-            print(f"Estimated attractor period: {period_ms:.2f} ms ({period_steps} steps)")
-            estimated_period_steps = period_steps
-            break
+    if num_neurons > 1:
+        if printouts:
+            print(f"Found more than one neuron ({num_neurons}). Using PCA to reduce to 1D for period estimation.")
+        pca = PCA(n_components=1)
+        signal = pca.fit_transform(voltage_history).flatten()
     else:
-        print("No oscillating signals found in any neuron. This is a point attractor.")
+        signal = voltage_history[:, 0]
+
+
+    estimated_period_steps = None    
+
+    # Check is the signal has meaningful variation
+    if np.std(signal) < 1e-3: # Threshold for a "flat" signal in mV
+        if printouts:
+            print("Signal has very low variation. This is a point attractor.")
+            print("Attractor voltage fingerprint: " + ", ".join([f"{v:.2f}" for v in voltage_history[-1, :]]))
         return characterize_attractor_spikes(fired_history, 0, 1)
+
+    # If there is variation, proceed with FFT
+    # Compute the frequency spectrum and find the dominant frequency
+    fft_vals = np.fft.rfft(signal - np.mean(signal))
+    fft_freq = np.fft.rfftfreq(len(signal), d=dt) # the frequencies are in kHz if dt is in ms
+    # Ignore the DC component (0 Hz) when searching for the dominant frequency
+    dominant_freq_hz = fft_freq[np.argmax(np.abs(fft_vals[1:])) + 1] # Avoid DC component, therefore 1:
     
-    # check that estimated_period_steps gives enough data for min_repetitions
-    if estimated_period_steps * min_repetitions > len(times):
+    if dominant_freq_hz > 0:
+        # Convert frequency to period in ms, where period = 1/frequency
+        period_ms = (1.0 / dominant_freq_hz)
+        # Convert period in ms to number of time steps
+        period_steps = int(period_ms / dt)
+        print(f"Estimated attractor period: {period_ms:.2f} ms ({period_steps} steps)")
+    else:
+        if printouts:
+            print("No dominant frequency found. This is likely a point attractor.")
+            print("Attractor voltage fingerprint: " + ", ".join([f"{v:.2f}" for v in voltage_history[-1, :]]))
+        return characterize_attractor_spikes(fired_history, 0, 1)
+
+    # check that period_steps gives enough data for min_repetitions
+    if period_steps * min_repetitions > len(times):
         print(f"Not enough data to cover {min_repetitions} repetitions of the estimated period. Cannot characterize attractor using this period.")
         return None
 
     # Finding the fingerprint based on the estimated period
     # Characterize the last full period of the simulation
     end_idx = len(times)
-    start_idx = end_idx - estimated_period_steps
+    start_idx = end_idx - period_steps
     if start_idx < 0:
         print("Not enough data to cover one full period. Cannot characterize attractor.")
         return None
@@ -323,12 +334,12 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
     # While the amount of data left after burn-in is sufficient
     while (uniform_times.shape[0] - burn_in) >= max(min_repetitions * 2, min_points):
         if variable_burn_in:
-            print(f"Using burn-in of {burn_in} points or {burn_in / uniform_times.shape[0] * 100:.1f}%.")
+            print(f"====\nUsing burn-in of {burn_in} points or {burn_in / uniform_times.shape[0] * 100:.1f}%.")
         rqa_result = perform_rqa_analysis(uniform_voltage_history, burn_in=burn_in, time_delay=time_delay, radius=radius,
                                         theiler_corrector=theiler_corrector, metric=metric, printouts=printouts, verbose=verbose)
         if rqa_result.determinism > det_threshold:
             fingerprint = fingerprint_attractors(uniform_voltage_history, uniform_fired_history, uniform_times,
-                                                 burn_in=burn_in, min_repetitions=min_repetitions)
+                                                 burn_in=burn_in, min_repetitions=min_repetitions, printouts=printouts)
             if printouts:
                 print(f"Significant determinism detected (DET={rqa_result.determinism:.3f}). Attempting to characterize attractors.")
             

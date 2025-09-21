@@ -28,7 +28,7 @@ times = [0.0]
 voltage_history = [[n1.v, n2.v]]
 fired_history = [[n1.fired, n2.fired]]
 
-for i in range(1000):
+for i in range(2000):
     voltages, fired = net.advance_event_driven(0.05, ret=['voltages', 'fired'])
     times.append(net.time_ms)
     voltage_history.append(voltages)
@@ -46,9 +46,9 @@ with open("iznn-demo-voltage_history.npy", "wb") as f:
 with open("iznn-demo-fired_history.npy", "wb") as f:
     np.save(f, fired_history)
 
-#draw_ctrnn_dynamics(voltage_history, uniform_time=False, times=times, iznn=True, save=True, show=False)
+draw_ctrnn_dynamics(voltage_history, uniform_time=False, times=times, iznn=True, save=True, show=False)
 
-#draw_ctrnn_trajectory(voltage_history, n_components=2, iznn=True, save=True, show=False)
+draw_ctrnn_trajectory(voltage_history, n_components=2, iznn=True, save=True, show=False)
 
 dynamic_attractors_pipeline(voltage_history=voltage_history, fired_history=fired_history, times_np=np.array(times),
                             variable_burn_in=True)
