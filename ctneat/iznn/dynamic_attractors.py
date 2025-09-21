@@ -10,6 +10,7 @@ from pyrqa.computation import RPComputation
 from pyrqa.image_generator import ImageGenerator
 import numpy as np
 from sklearn.decomposition import PCA
+from scipy.signal import find_peaks
 
 
 def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Optional[Union[float, str]] = None) -> Tuple[np.ndarray, np.ndarray]:
@@ -164,6 +165,80 @@ def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end
     return "-".join(fingerprint)
 
 
+def characterize_attractor_voltage(voltage_history_cycle: np.ndarray, 
+                                     dt: float, 
+                                     num_peaks: int = 3, 
+                                     min_peak_prominence: float = 0.1) -> str:
+    """
+    Creates a voltage-based fingerprint for an attractor cycle that is invariant
+    to neuron order.
+
+    It works by finding the top frequency components for each neuron's voltage
+    oscillation, creating a string representation for each, and then sorting these
+    strings before joining them.
+
+    Args:
+        voltage_history_cycle (np.ndarray): A 2D array (time_steps x neurons)
+                                            containing the voltage data for one
+                                            full attractor period.
+        dt (float): The time step of the uniformly sampled data in milliseconds.
+        num_peaks (int): The maximum number of frequency peaks to include for
+                         each neuron.
+        min_peak_prominence (float): The minimum prominence for a peak in the
+                                     frequency spectrum to be considered. This helps
+                                     filter out noise.
+
+    Returns:
+        str: A canonical fingerprint string of the attractor's voltage dynamics.
+    """
+    num_steps, num_neurons = voltage_history_cycle.shape
+    if num_steps == 0:
+        return "no_data"
+
+    # A list to hold the fingerprint string of each neuron
+    neuron_fingerprints = []
+
+    for i in range(num_neurons):
+        signal = voltage_history_cycle[:, i]
+        
+        # Perform FFT
+        fft_vals = np.fft.rfft(signal - np.mean(signal))
+        fft_freq = np.fft.rfftfreq(len(signal), d=dt)
+        power_spectrum = np.abs(fft_vals)**2
+
+        # Find peaks in the power spectrum, ignoring the DC component (at index 0)
+        peaks, properties = find_peaks(power_spectrum[1:], prominence=min_peak_prominence)
+        
+        if len(peaks) == 0:
+            # If no significant peaks, characterize as flat
+            neuron_fingerprints.append(f"N{i}(flat,v:{signal[-1]:.2f})")
+            continue
+
+        # Get the power of the found peaks
+        peak_powers = properties['prominences']
+        
+        # Get the indices of the most powerful peaks
+        top_peak_indices = np.argsort(peak_powers)[::-1][:num_peaks]
+        
+        # Get the corresponding frequencies and magnitudes (using sqrt of power)
+        top_freqs = fft_freq[peaks[top_peak_indices] + 1] # +1 to correct for slicing
+        top_mags = np.sqrt(peak_powers[top_peak_indices])
+        
+        # Create a canonical representation for this neuron by sorting its peaks by freq
+        peak_info = sorted(zip(top_freqs, top_mags), key=lambda x: x[0])
+        
+        # Format into a string, e.g., "f:10.5,m:2.3|f:21.0,m:1.1"
+        peak_str = "|".join([f"f:{freq:.1f},m:{mag:.2f}" for freq, mag in peak_info])
+        neuron_fingerprints.append(f"N{i}({peak_str})")
+
+    # CRUCIAL STEP: Sort the individual neuron fingerprints alphabetically.
+    # This makes the final fingerprint invariant to the original neuron order.
+    # e.g., ['N1(..)', 'N0(..)'] will become ['N0(..)', 'N1(..)']
+    neuron_fingerprints.sort()
+    
+    return "-".join(neuron_fingerprints)
+
+
 def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarray, times: np.ndarray,
                            burn_in: Optional[Union[int, float]] = None, min_repetitions: int = 3,
                            printouts: bool = False) -> Optional[str]:
@@ -216,15 +291,11 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
     else:
         signal = voltage_history[:, 0]
 
-
-    estimated_period_steps = None    
-
     # Check is the signal has meaningful variation
     if np.std(signal) < 1e-3: # Threshold for a "flat" signal in mV
         if printouts:
-            print("Signal has very low variation. This is a point attractor.")
-            print("Attractor voltage fingerprint: " + ", ".join([f"{v:.2f}" for v in voltage_history[-1, :]]))
-        return characterize_attractor_spikes(fired_history, 0, 1)
+            print("Signal has very low variation. This is probably a point attractor.")
+        return characterize_attractor_voltage(voltage_history, dt)
 
     # If there is variation, proceed with FFT
     # Compute the frequency spectrum and find the dominant frequency
@@ -242,8 +313,7 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
     else:
         if printouts:
             print("No dominant frequency found. This is likely a point attractor.")
-            print("Attractor voltage fingerprint: " + ", ".join([f"{v:.2f}" for v in voltage_history[-1, :]]))
-        return characterize_attractor_spikes(fired_history, 0, 1)
+        return characterize_attractor_voltage(voltage_history, dt)
 
     # check that period_steps gives enough data for min_repetitions
     if period_steps * min_repetitions > len(times):
@@ -258,7 +328,7 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         print("Not enough data to cover one full period. Cannot characterize attractor.")
         return None
     
-    fingerprint = characterize_attractor_spikes(fired_history, start_idx, end_idx)        
+    fingerprint = characterize_attractor_voltage(voltage_history[start_idx:end_idx, :], dt)
     print(f"Attractor fingerprint: {fingerprint}")
     return fingerprint
 
