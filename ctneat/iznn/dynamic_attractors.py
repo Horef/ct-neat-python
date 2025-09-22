@@ -189,7 +189,13 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
                                      filter out noise.
 
     Returns:
-        str: A canonical fingerprint string of the attractor's voltage dynamics.
+        str: A canonical fingerprint string of the attractor's voltage dynamics in the form:
+            "N0(f:10.5,m:2.3|f:21.0,m:1.1)-N1(f:9.8,m:1.5|f:20.5,m:0.9)"
+            where each neuron's peaks are sorted by frequency, and neurons are sorted
+            alphabetically by their identifier (N0, N1, ...).
+            If the number of time steps is zero, returns "no_data".
+            If a neuron's voltage is flat (no significant peaks), 
+            it is denoted as N<neuron_id>(flat, v:<last_voltage>).
     """
     num_steps, num_neurons = voltage_history_cycle.shape
     if num_steps == 0:
@@ -240,7 +246,10 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
 
 
 def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarray, times: np.ndarray,
+                           fingerprint_using: str = 'voltage',
                            burn_in: Optional[Union[int, float]] = None, min_repetitions: int = 3,
+                           flat_signal_threshold: float = 1e-1,
+                           num_peaks: int = 3, min_peak_prominence: float = 0.1,
                            printouts: bool = False) -> Optional[str]:
     """
     Analyzes the voltage and firing history to identify and characterize attractor periods.
@@ -251,22 +260,34 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         fired_history (np.ndarray): A 2D array (time steps x neurons) of firing states (1.0 or 0.0).
         voltage_history (np.ndarray): A 2D array (time steps x neurons) of voltage values.
         times (np.ndarray): A 1D array of time stamps corresponding to the data points.
+        fingerprint_using (str): The method to use for generating the fingerprint of the attractor.
+            Options are 'voltage' (using the voltage trace) or 'firing' (using the firing rate).
+            Default is 'voltage'.
         burn_in (Optional[Union[int, float]]): Number of initial time steps to discard from the analysis. 
             If float, treated as percentage. If int, treated as absolute number of steps. If None, defaults to 0.
         min_repetitions (int): Minimum number of repetitions of the attractor cycle to confirm its presence.
+        flat_signal_threshold (float): Threshold for standard deviation to consider a signal as "flat" (in mV).
+        num_peaks (int): The maximum number of frequency peaks to include for each neuron when using voltage fingerprinting.
+        min_peak_prominence (float): The minimum prominence for a peak in the frequency spectrum to be 
+            considered when using voltage fingerprinting. This helps filter out noise.
         printouts (bool): Whether to print summarized analysis information.
     Returns:
         Optional[str]: A string representing the spike pattern of the attractor, or None if no attractor is found.
-            Neurons that fire at each time step are listed, separated by commas, and time steps are separated by hyphens. 
-            Non-firing steps are denoted by '_'.
+            In case of voltage fingerprinting, the string represents the frequency components of each neuron.
+            In case of firing fingerprinting, the string represents the firing pattern of the attractor.
     Raises:
         ValueError: If the input arrays have incompatible shapes or if the time data is not uniformly sampled.
+        ValueError: If fingerprint_using is not recognized.
     """
+    if fingerprint_using not in ['voltage', 'firing']:
+        raise ValueError("fingerprint_using must be either 'voltage' or 'firing'.")
+
     if fired_history.shape != voltage_history.shape:
         raise ValueError("fired_history and voltage_history must have the same shape.")
     if fired_history.shape[0] != len(times):
         raise ValueError("Length of times must match the number of time steps in fired_history and voltage_history.")
     
+    # Apply burn-in if specified
     if burn_in is not None:
         if isinstance(burn_in, float):
             burn_in = int(burn_in * times.shape[0])
@@ -282,6 +303,8 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         raise ValueError("Data must be uniformly sampled in time.")
     dt = dt[0]
 
+    # If there is more than one neuron, there is no way to know which one to use for period estimation
+    # or otherwise use all of them in some way. Therefore, we use PCA to reduce to 1D which captures the main variation.
     num_neurons = fired_history.shape[1]
     if num_neurons > 1:
         if printouts:
@@ -292,10 +315,13 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         signal = voltage_history[:, 0]
 
     # Check is the signal has meaningful variation
-    if np.std(signal) < 1e-3: # Threshold for a "flat" signal in mV
+    if np.std(signal) < flat_signal_threshold: # Threshold for a "flat" signal in mV
         if printouts:
             print("Signal has very low variation. This is probably a point attractor.")
-        return characterize_attractor_voltage(voltage_history, dt)
+        if fingerprint_using == 'firing':
+            return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
+        else: # fingerprint_using == 'voltage'
+            return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
 
     # If there is variation, proceed with FFT
     # Compute the frequency spectrum and find the dominant frequency
@@ -309,15 +335,20 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         period_ms = (1.0 / dominant_freq_hz)
         # Convert period in ms to number of time steps
         period_steps = int(period_ms / dt)
-        print(f"Estimated attractor period: {period_ms:.2f} ms ({period_steps} steps)")
+        if printouts:
+            print(f"Estimated attractor period: {period_ms:.2f} ms ({period_steps} steps)")
     else:
         if printouts:
             print("No dominant frequency found. This is likely a point attractor.")
-        return characterize_attractor_voltage(voltage_history, dt)
+        if fingerprint_using == 'firing':
+            return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
+        else: # fingerprint_using == 'voltage'
+            return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
 
     # check that period_steps gives enough data for min_repetitions
     if period_steps * min_repetitions > len(times):
-        print(f"Not enough data to cover {min_repetitions} repetitions of the estimated period. Cannot characterize attractor using this period.")
+        if printouts:
+            print(f"Not enough data to cover {min_repetitions} repetitions of the estimated period. Cannot characterize attractor using this period.")
         return None
 
     # Finding the fingerprint based on the estimated period
@@ -325,19 +356,27 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
     end_idx = len(times)
     start_idx = end_idx - period_steps
     if start_idx < 0:
-        print("Not enough data to cover one full period. Cannot characterize attractor.")
+        if printouts:
+            print("Not enough data to cover one full period. Cannot characterize attractor.")
         return None
     
-    fingerprint = characterize_attractor_voltage(voltage_history[start_idx:end_idx, :], dt)
-    print(f"Attractor fingerprint: {fingerprint}")
+    if fingerprint_using == 'firing':
+        fingerprint = characterize_attractor_spikes(fired_history[start_idx:end_idx, :], 0, period_steps)    
+    else: # fingerprint_using == 'voltage'
+        fingerprint = characterize_attractor_voltage(voltage_history[start_idx:end_idx, :], dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
+    if printouts:
+        print(f"Attractor fingerprint: {fingerprint}")
     return fingerprint
 
 
-def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.ndarray, times_np: np.ndarray, 
+def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.ndarray, times_np: np.ndarray,
+                                dt_uniform_ms: Optional[Union[float, str]] = None, 
                                 burn_in: Optional[Union[int, float]] = 0.25, variable_burn_in: bool = False,
                                 burn_in_rate: float = 0.5, min_repetitions: int = 3, min_points: int = 100,
                                 time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 2,
-                                det_threshold: float = 0.2, metric: str = 'euclidean', 
+                                det_threshold: float = 0.2, metric: str = 'euclidean',
+                                fingerprint_using: str = 'voltage', flat_signal_threshold: float = 1e-1,
+                                num_peaks: int = 3, min_peak_prominence: float = 0.1,
                                 printouts: bool = True, verbose: bool = False) -> Optional[str]:
     """
     Full pipeline to analyze dynamic attractors in IZNN data.
@@ -349,6 +388,9 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
         fired_history (np.ndarray): A 2D numpy array where each row corresponds to a time step,
                                      and each column corresponds to a specific neuron's firing state.
         times_np (np.ndarray): A 1D numpy array of time stamps corresponding to the data points.
+        dt_uniform_ms (Optional[Union[float, str]]): The desired uniform time step in milliseconds. 
+            Valid options are a positive float or 'min', 'max', 'avg' and 'median'.
+            If not set, will be set to the smallest interval in times_np.
         burn_in (Optional[Union[int, float]]): Number of initial time steps to discard from the analysis. 
             If float, treated as percentage. If int, treated as absolute number of steps. If None, defaults to 0.
         variable_burn_in (bool): If True, adds an option to variably increase the burn-in period in case
@@ -371,20 +413,32 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
             If the DET from RQA is above this threshold, the attractor characterization is performed.
         metric (str): The distance metric to use ('euclidean', 'taxicab', 'maximum') 
             or alternatively ('l2', 'l1' and 'linf'). Case insensitive. Default is 'euclidean'.
+        fingerprint_using (str): The method to use for generating the fingerprint of the attractor.
+            Options are 'voltage' (using the voltage trace) or 'firing' (using the firing rate).
+            Default is 'voltage'.
+        flat_signal_threshold (float): Threshold for standard deviation to consider a signal as "flat" (in mV).
+        num_peaks (int): The maximum number of frequency peaks to include for each neuron when using voltage fingerprinting.
+        min_peak_prominence (float): The minimum prominence for a peak in the frequency spectrum to be 
+            considered when using voltage fingerprinting. This helps filter out noise.
         printouts (bool): If True, prints summary information about the analysis.
         verbose (bool): If True, prints detailed information during the analysis. (If set to true, also enables printouts.)
     Returns:
-        Optional[str]: A string representing the spike pattern of the attractor, or None if no attractor is found
-                       or if the determinism is below the specified threshold.
+        Optional[str]: A string representing the spike pattern of the attractor, or None if no attractor can be found.
+            Neurons that fire at each time step are listed, separated by commas, and time steps are separated by hyphens.
     Raises:
-        ValueError: If the input arrays have incompatible shapes or if the time data is not uniformly sampled.
+        ValueError: If dt_uniform_ms is invalid or if fingerprint_using is not recognized.
     """
+    if fingerprint_using not in ['voltage', 'firing']:
+        raise ValueError("fingerprint_using must be either 'voltage' or 'firing'.")
+    if (isinstance(dt_uniform_ms, float) and dt_uniform_ms <= 0) or (isinstance(dt_uniform_ms, str) and dt_uniform_ms not in ['min', 'max', 'avg', 'median']):
+        raise ValueError("dt_uniform_ms must be a positive float or one of the strings: 'min', 'max', 'avg', 'median'.")
+
     if verbose:
         print("Starting dynamic attractors analysis pipeline...")
         printouts = True
 
-    uniform_times, uniform_voltage_history = resample_data(times_np, voltage_history)
-    _, uniform_fired_history = resample_data(times_np, fired_history)
+    uniform_times, uniform_voltage_history = resample_data(times_np, voltage_history, dt_uniform_ms=dt_uniform_ms)
+    _, uniform_fired_history = resample_data(times_np, fired_history, dt_uniform_ms=dt_uniform_ms)
     if printouts:
         print(f"Resampled data to uniform time steps.\n"
               f"Original shape: {voltage_history.shape}, New shape: {uniform_voltage_history.shape}, Time step: {uniform_times[1]-uniform_times[0]:.4f} ms")
@@ -404,11 +458,17 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
     # While the amount of data left after burn-in is sufficient
     while (uniform_times.shape[0] - burn_in) >= max(min_repetitions * 2, min_points):
         if variable_burn_in:
-            print(f"====\nUsing burn-in of {burn_in} points or {burn_in / uniform_times.shape[0] * 100:.1f}%.")
+            if printouts:
+                print(f"====\nUsing burn-in of {burn_in} points or {burn_in / uniform_times.shape[0] * 100:.1f}%.")
+        # Perform RQA analysis on the voltage data to detect determinism
         rqa_result = perform_rqa_analysis(uniform_voltage_history, burn_in=burn_in, time_delay=time_delay, radius=radius,
                                         theiler_corrector=theiler_corrector, metric=metric, printouts=printouts, verbose=verbose)
+        # If the determinism is above the threshold, it is likely there is an attractor, so we try to characterize it
         if rqa_result.determinism > det_threshold:
+            # Fingerprint the attractor using the chosen method
             fingerprint = fingerprint_attractors(uniform_voltage_history, uniform_fired_history, uniform_times,
+                                                 fingerprint_using=fingerprint_using, flat_signal_threshold=flat_signal_threshold,
+                                                 num_peaks=num_peaks, min_peak_prominence=min_peak_prominence,
                                                  burn_in=burn_in, min_repetitions=min_repetitions, printouts=printouts)
             if printouts:
                 print(f"Significant determinism detected (DET={rqa_result.determinism:.3f}). Attempting to characterize attractors.")
