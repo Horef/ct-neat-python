@@ -20,7 +20,7 @@ iznn_nodes = {1: n1, 2: n2}
 
 net = ctneat.iznn.IZNN(iznn_nodes, [0], [1, 2])
 
-init0 = 2.5
+init0 = 0
 
 net.set_inputs([init0])
 
@@ -48,12 +48,14 @@ with open("iznn-demo-fired_history.npy", "wb") as f:
 
 
 print("Resampling the data to uniform time steps using simulation...")
-time_steps_uniform_sim, voltage_history_uniform_sim = resample_data(np.array(times), voltage_history, dt_uniform_ms='min', 
+uniform_time_steps, uniform_voltage_history = resample_data(np.array(times), voltage_history, dt_uniform_ms='min', 
                                                             using_simulation=True, net=net, events=False, ret='voltages')
-draw_ctrnn_dynamics(voltage_history_uniform_sim, uniform_time=True, iznn=True, save=True, show=False, file_name="iznn_dynamics_uniform_sim")
+_, uniform_fired_history = resample_data(np.array(times), fired_history, dt_uniform_ms='min', 
+                                        using_simulation=True, net=net, events=True, ret='fired')
+draw_ctrnn_dynamics(uniform_voltage_history, uniform_time=True, iznn=True, save=True, show=False)
 
-draw_ctrnn_trajectory(voltage_history_uniform_sim, n_components=2, iznn=True, save=True, show=False)
+draw_ctrnn_trajectory(uniform_voltage_history, n_components=2, iznn=True, save=True, show=False)
 
-dynamic_attractors_pipeline(voltage_history=voltage_history, fired_history=fired_history, times_np=np.array(times),
+dynamic_attractors_pipeline(voltage_history=uniform_voltage_history, fired_history=uniform_fired_history, times_np=uniform_time_steps,
                             variable_burn_in=True)
 
