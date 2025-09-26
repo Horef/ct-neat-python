@@ -1,5 +1,6 @@
 import ctneat
 from ctneat.ctrnn.ctrnn_visualize import draw_ctrnn_net, draw_ctrnn_dynamics, draw_ctrnn_trajectory
+from ctneat.iznn.dynamic_attractors import resample_data
 import os
 import sys
 import numpy as np
@@ -70,7 +71,39 @@ def test_network_visualization():
     if os.path.exists("iznn_trajectory_test.png"):
         os.remove("iznn_trajectory_test.png")    
     
+def test_resample_data():
+    node1_inputs = [(0, 0.5) ,(1, 0.9), (2, 0.5)]
+    node2_inputs = [(0, 0.2), (1, -0.2), (2, 0.8)]
+
+    n1 = ctneat.iznn.IZNeuron(bias=0.0, **ctneat.iznn.THALAMO_CORTICAL_PARAMS, inputs=node1_inputs)
+    n2 = ctneat.iznn.IZNeuron(bias=0.0, **ctneat.iznn.THALAMO_CORTICAL_PARAMS, inputs=node2_inputs)
+
+    iznn_nodes = {1: n1, 2: n2}
+
+    net = ctneat.iznn.IZNN(iznn_nodes, [0], [1, 2])
+
+    init0 = 2.5
+
+    net.set_inputs([init0])
+
+    times = [0.0]
+    voltage_history = [[n1.v, n2.v]]
+    fired_history = [[n1.fired, n2.fired]]
+
+    for i in range(200):
+        voltages, fired = net.advance_event_driven(0.05, ret=['voltages', 'fired'])
+        times.append(net.time_ms)
+        voltage_history.append(voltages)
+        fired_history.append(fired)
+
+    voltage_history = np.array(voltage_history)
+    fired_history = np.array(fired_history)
+
+    time_steps_uniform_sim, voltage_history_uniform_sim = resample_data(np.array(times), voltage_history, dt_uniform_ms='min', 
+                                                                using_simulation=True, net=net, events=False, ret='voltages')
     
+    time_steps_uniform_interp, voltage_history_uniform_interp = resample_data(np.array(times), voltage_history, dt_uniform_ms='min', 
+                                                                using_simulation=False)
 
 
 # # TODO: Update this test to work with the current implementation.
