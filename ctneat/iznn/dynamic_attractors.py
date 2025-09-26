@@ -393,7 +393,8 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
 
 
 def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.ndarray, times_np: np.ndarray,
-                                dt_uniform_ms: Optional[Union[float, str]] = None, 
+                                dt_uniform_ms: Optional[Union[float, str]] = None,
+                                using_simulation: bool = True, net: Optional[IZNN] = None,
                                 burn_in: Optional[Union[int, float]] = 0.25, variable_burn_in: bool = False,
                                 burn_in_rate: float = 0.5, min_repetitions: int = 3, min_points: int = 100,
                                 time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 2,
@@ -414,6 +415,9 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
         dt_uniform_ms (Optional[Union[float, str]]): The desired uniform time step in milliseconds. 
             Valid options are a positive float or 'min', 'max', 'avg' and 'median'.
             If not set, will be set to the smallest interval in times_np.
+        using_simulation (bool): If true, uses the network provided in the net argument to recalculate the data.
+            If false, uses linear interpolation to resample the data.
+        net (IZNN): The IZNN network used to run the simulation.
         burn_in (Optional[Union[int, float]]): Number of initial time steps to discard from the analysis. 
             If float, treated as percentage. If int, treated as absolute number of steps. If None, defaults to 0.
         variable_burn_in (bool): If True, adds an option to variably increase the burn-in period in case
@@ -460,8 +464,8 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
         print("Starting dynamic attractors analysis pipeline...")
         printouts = True
 
-    uniform_times, uniform_voltage_history = resample_data(times_np, voltage_history, dt_uniform_ms=dt_uniform_ms)
-    _, uniform_fired_history = resample_data(times_np, fired_history, dt_uniform_ms=dt_uniform_ms)
+    uniform_times, uniform_voltage_history = resample_data(times_np, voltage_history, dt_uniform_ms=dt_uniform_ms, using_simulation=using_simulation, net=net, ret='voltages')
+    _, uniform_fired_history = resample_data(times_np, fired_history, dt_uniform_ms=dt_uniform_ms, using_simulation=using_simulation, net=net, ret='fired')
     if printouts:
         print(f"Resampled data to uniform time steps.\n"
               f"Original shape: {voltage_history.shape}, New shape: {uniform_voltage_history.shape}, Time step: {uniform_times[1]-uniform_times[0]:.4f} ms")
