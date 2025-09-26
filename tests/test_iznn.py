@@ -1,5 +1,8 @@
 import ctneat
-
+from ctneat.ctrnn.ctrnn_visualize import draw_ctrnn_net, draw_ctrnn_dynamics, draw_ctrnn_trajectory
+import os
+import sys
+import numpy as np
 
 def test_basic():
     p = ctneat.iznn.REGULAR_SPIKING_PARAMS
@@ -23,6 +26,51 @@ def test_network():
     net.set_inputs([1.0, 0.0])
     net.advance(0.25)
     net.advance(0.25)
+
+def test_network_visualization():
+    node1_inputs = [(0, 0.5) ,(1, 0.9), (2, 0.5)]
+    node2_inputs = [(0, 0.2), (1, -0.2), (2, 0.8)]
+
+    draw_ctrnn_net([0, 1, 2], {1: node1_inputs, 2: node2_inputs}, iznn=True, file_name="iznn_network_test")
+    # cleanup the generated file
+    if os.path.exists("iznn_network_test.png"):
+        os.remove("iznn_network_test.png")
+
+    n1 = ctneat.iznn.IZNeuron(bias=0.0, **ctneat.iznn.THALAMO_CORTICAL_PARAMS, inputs=node1_inputs)
+    n2 = ctneat.iznn.IZNeuron(bias=0.0, **ctneat.iznn.THALAMO_CORTICAL_PARAMS, inputs=node2_inputs)
+
+    iznn_nodes = {1: n1, 2: n2}
+
+    net = ctneat.iznn.IZNN(iznn_nodes, [0], [1, 2])
+
+    init0 = 2.5
+
+    net.set_inputs([init0])
+
+    times = [0.0]
+    voltage_history = [[n1.v, n2.v]]
+    fired_history = [[n1.fired, n2.fired]]
+
+    for i in range(100):
+        voltages, fired = net.advance_event_driven(0.05, ret=['voltages', 'fired'])
+        times.append(net.time_ms)
+        voltage_history.append(voltages)
+        fired_history.append(fired)
+
+    voltage_history = np.array(voltage_history)
+    fired_history = np.array(fired_history)
+
+    draw_ctrnn_dynamics(voltage_history, uniform_time=False, times=times, iznn=True, save=True, show=False, file_name="iznn_dynamics_test")
+    # cleanup the generated file
+    if os.path.exists("iznn_dynamics_test.png"):
+        os.remove("iznn_dynamics_test.png")
+
+    draw_ctrnn_trajectory(voltage_history, n_components=2, iznn=True, save=True, show=False, file_name="iznn_trajectory_test")
+    # cleanup the generated file
+    if os.path.exists("iznn_trajectory_test.png"):
+        os.remove("iznn_trajectory_test.png")    
+    
+    
 
 
 # # TODO: Update this test to work with the current implementation.

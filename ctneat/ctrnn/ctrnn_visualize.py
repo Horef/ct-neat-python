@@ -14,7 +14,7 @@ def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = Fa
     Args:
         node_list: A list of node IDs in the network.
         node_inputs: A dictionary where keys are node IDs and values are lists of input connections for each node.
-        (I.e. each list contains tuples of (input_node_id, weight) for the node with the corresponding ID)
+            (I.e. each list contains tuples of (input_node_id, weight) for the node with the corresponding ID)
         iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         dir_name: Optional directory name to save the output file. If None, saves in the current directory.
         file_name: Optional file name to save the output file. If None, defaults to 'ctrnn_network'.
@@ -33,12 +33,17 @@ def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = Fa
 
     dot.render(file_name or 'iznn_network' if iznn else 'ctrnn_network', format='png', cleanup=True, directory=dir_name or '.')
 
-def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Optional[Union[np.ndarray, list]] = None, iznn: Optional[bool] = False, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
+def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Optional[Union[np.ndarray, list]] = None, 
+                        iznn: Optional[bool] = False, save: bool = False, show: bool = True, 
+                        dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
     """
     This function draws the dynamics of the CTRNN over time.
     Args:
         states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
-        and each column corresponds to a specific node's state.
+            and each column corresponds to a specific node's state.
+        uniform_time: Whether the time steps are uniform. If True, the function generates a uniform time array.
+        times: If uniform_time is False, a list or numpy array of time points corresponding to each row in states.
+            If uniform_time is True, this parameter is ignored.
         iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         save: Whether to save the plot as a file. If False, the plot is shown interactively.
         show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.

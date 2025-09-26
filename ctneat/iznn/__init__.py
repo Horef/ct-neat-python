@@ -359,7 +359,10 @@ class IZNN(object):
                     - 'RK45' (Default): An adaptive Runge-Kutta method of order 5(4). It's a great general-purpose choice and a good starting point.
                     - 'RK23': A lower-order adaptive Runge-Kutta method. Faster but less accurate than RK45.
                     - 'DOP853': A high-order (8th) adaptive Runge-Kutta method for when you need very high precision.
-                    - 'LSODA': This is a particularly important one for spiking neurons. It's a solver that automatically switches between methods for non-stiff and stiff problems. A "stiff" ODE is one where some parts of the solution change very rapidly while others change slowly (like the membrane potential during a spike!). LSODA is often very efficient and stable for these kinds of systems.
+                    - 'LSODA': This is a particularly important one for spiking neurons. It's a solver that automatically 
+                        switches between methods for non-stiff and stiff problems. A "stiff" ODE is one where some parts of 
+                        the solution change very rapidly while others change slowly (like the membrane potential during 
+                        a spike!). LSODA is often very efficient and stable for these kinds of systems.
                     - 'BDF' and 'Radau': Other excellent methods for stiff problems.
             events (bool): Whether to use event detection for spikes. Only applicable if 'method' is specified.
             ret (list(str) or str or None): Specifies what to return.

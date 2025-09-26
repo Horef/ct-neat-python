@@ -5,7 +5,7 @@ import sys
 
 import ctneat
 from ctneat.ctrnn.ctrnn_visualize import draw_ctrnn_net, draw_ctrnn_dynamics, draw_ctrnn_trajectory
-from ctneat.iznn.dynamic_attractors import dynamic_attractors_pipeline
+from ctneat.iznn.dynamic_attractors import dynamic_attractors_pipeline, resample_data
 
 # Create a fully-connected network of a few neurons with no external inputs.
 node1_inputs = [(0, 0.5) ,(1, 0.9), (2, 0.5)]
@@ -20,7 +20,7 @@ iznn_nodes = {1: n1, 2: n2}
 
 net = ctneat.iznn.IZNN(iznn_nodes, [0], [1, 2])
 
-init0 = 1
+init0 = 2.5
 
 net.set_inputs([init0])
 
@@ -48,8 +48,19 @@ with open("iznn-demo-fired_history.npy", "wb") as f:
 
 draw_ctrnn_dynamics(voltage_history, uniform_time=False, times=times, iznn=True, save=True, show=False)
 
-draw_ctrnn_trajectory(voltage_history, n_components=2, iznn=True, save=True, show=False)
+# testing the function for uniform time steps
+print("Resampling the data to uniform time steps using simulation...")
+time_steps_uniform_sim, voltage_history_uniform_sim = resample_data(np.array(times), voltage_history, dt_uniform_ms='min', 
+                                                            using_simulation=True, net=net, events=False, ret='voltages')
+draw_ctrnn_dynamics(voltage_history_uniform_sim, uniform_time=True, iznn=True, save=True, show=False, file_name="iznn_dynamics_uniform_sim")
 
-dynamic_attractors_pipeline(voltage_history=voltage_history, fired_history=fired_history, times_np=np.array(times),
-                            variable_burn_in=True)
+print("Resampling the data to uniform time steps using interpolation...")
+time_steps_uniform_interp, voltage_history_uniform_interp = resample_data(np.array(times), voltage_history, dt_uniform_ms='min', 
+                                                            using_simulation=False)
+draw_ctrnn_dynamics(voltage_history_uniform_interp, uniform_time=True, iznn=True, save=True, show=False, file_name="iznn_dynamics_uniform_interp")
+
+# draw_ctrnn_trajectory(voltage_history, n_components=2, iznn=True, save=True, show=False)
+
+# dynamic_attractors_pipeline(voltage_history=voltage_history, fired_history=fired_history, times_np=np.array(times),
+#                             variable_burn_in=True)
 

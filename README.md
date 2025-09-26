@@ -31,7 +31,7 @@ to the citation, please submit an issue or email s@unzim.com.
 
 APA
 ```
-Horef, S. McIntyre, A., Kallada, M., Miguel, C. G., Feher de Silva, C., & Netto, M. L. ct-neat-python [Computer software]
+Horef, S., McIntyre, A., Kallada, M., Miguel, C. G., Feher de Silva, C., & Netto, M. L. ct-neat-python [Computer software]
 ```
 
 Bibtex

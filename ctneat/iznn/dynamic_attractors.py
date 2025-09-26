@@ -1,4 +1,5 @@
 from typing import Optional, Union, Tuple
+from ctneat.iznn import IZNN
 from pyrqa.time_series import TimeSeries
 from pyrqa.settings import Settings
 from pyrqa.result import RQAResult
@@ -13,7 +14,8 @@ from sklearn.decomposition import PCA
 from scipy.signal import find_peaks
 
 
-def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Optional[Union[float, str]] = None) -> Tuple[np.ndarray, np.ndarray]:
+def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Optional[Union[float, str]] = None,
+                  using_simulation: bool = False, net: Optional[IZNN] = None, events: bool = False, ret: str = 'voltages') -> Tuple[np.ndarray, np.ndarray]:
     """
     Resamples non-uniformly sampled data to a uniform time grid using linear interpolation.
 
@@ -23,10 +25,24 @@ def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Opti
         dt_uniform_ms (float): The desired uniform time step in milliseconds. 
             Valid options are a positive float or 'min', 'max', 'avg' and 'median'.
             If not set, will be set to the smallest interval in times_np.
-
+        using_simulation (bool): If true, uses the network provided in the net argument to recalculate the data.
+            If false, uses linear interpolation to resample the data.
+        net (IZNN): The IZNN network used to run the simulation.
+        events (bool): If using_simulation is True, specifies whether to do event-driven simulation.
+        ret (str): If using_simulation is True, specifies what to return from the simulation.
+            Valid strings are:
+                'fired' - returns the firing states (1.0 if fired, 0.0 otherwise)
+                'voltages' - returns the membrane potentials (in millivolts)
+                'recovery' - returns the recovery variables (in millivolts)
+            Default is 'voltages'.
     Returns:
         A tuple (uniform_times, uniform_data)
+    Raises:
+        ValueError: If dt_uniform_ms is invalid or if using_simulation is True but no network is provided.
     """
+    if using_simulation and net is None:
+        raise ValueError("If using_simulation is True, a valid IZNN network must be provided in the net argument.")
+
     if dt_uniform_ms is None:
         dt_uniform_ms = np.min(np.diff(times_np))
     elif isinstance(dt_uniform_ms, str):
@@ -51,9 +67,16 @@ def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Opti
     num_uniform_steps = len(uniform_times)
     uniform_data = np.zeros((num_uniform_steps, num_neurons))
 
-    # Interpolate each neuron's data onto the new grid
-    for i in range(num_neurons):
-        uniform_data[:, i] = np.interp(uniform_times, times_np, data_np[:, i])
+    if using_simulation:
+        # Run the simulation to get the data at uniform time steps
+        net.reset()
+        for idx in range(uniform_data.shape[0]):
+            state = net.advance(dt_msec=dt_uniform_ms, events=events, ret=ret)
+            uniform_data[idx, :] = state
+    else:
+        # Interpolate each neuron's data onto the new grid
+        for i in range(num_neurons):
+            uniform_data[:, i] = np.interp(uniform_times, times_np, data_np[:, i])
 
     return uniform_times, uniform_data
 
@@ -115,7 +138,7 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
         radius = (0.2 * np.std(data_points)).item()
 
     time_series = TimeSeries(data_points,
-                            embedding_dimension=data_points.shape[1],
+                            embedding_dimension=2*data_points.shape[1],
                             time_delay=time_delay)
     settings = Settings(time_series,
                         analysis_type=Classic,
@@ -129,10 +152,10 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
         print(result)
 
     # in addition, save the recurrence plot as an image
-    computation = RPComputation.create(settings)
-    rpc_result = computation.run()
-    ImageGenerator.save_recurrence_plot(rpc_result.recurrence_matrix_reverse,
-                                        'recurrence_plot.png')
+    # computation = RPComputation.create(settings)
+    # rpc_result = computation.run()
+    # ImageGenerator.save_recurrence_plot(rpc_result.recurrence_matrix_reverse,
+    #                                     'recurrence_plot.png')
     
     return result
 
