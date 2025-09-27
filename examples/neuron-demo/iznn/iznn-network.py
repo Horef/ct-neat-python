@@ -51,7 +51,7 @@ print("Resampling the data to uniform time steps using simulation...")
 uniform_time_steps, uniform_voltage_history = resample_data(np.array(times), voltage_history, dt_uniform_ms='min', 
                                                             using_simulation=True, net=net, events=False, ret='voltages')
 _, uniform_fired_history = resample_data(np.array(times), fired_history, dt_uniform_ms='min', 
-                                        using_simulation=True, net=net, events=True, ret='fired')
+                                        using_simulation=True, net=net, events=False, ret='fired')
 draw_ctrnn_dynamics(uniform_voltage_history, uniform_time=True, iznn=True, save=True, show=False)
 
 draw_ctrnn_trajectory(uniform_voltage_history, n_components=2, iznn=True, save=True, show=False)

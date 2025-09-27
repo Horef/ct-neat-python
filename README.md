@@ -23,6 +23,12 @@ a good place to start) and then try creating your own experiment.
 
 The documentation is available on [Read The Docs](http://neat-python.readthedocs.io).
 
+If you want to contribute to the directory and run the code in a developer setting, run the following from the root of the project:
+```
+pip install -e .
+```
+This will install the package in a dynamically linked mode such that all of your changes will be immediately reflected.
+
 ## Citing ##
 
 Here are APA and Bibtex entries you can use to cite this project in a publication. The listed authors are the originators
