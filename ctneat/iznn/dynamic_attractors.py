@@ -12,6 +12,8 @@ from pyrqa.image_generator import ImageGenerator
 import numpy as np
 from sklearn.decomposition import PCA
 from scipy.signal import find_peaks
+from math import gcd
+from functools import reduce
 
 
 def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Optional[Union[float, str]] = None,
@@ -269,7 +271,8 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
 
 
 def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarray, times: np.ndarray,
-                           superimpose: bool = False, fingerprint_using: str = 'voltage',
+                           superimpose: bool = False, use_lcm: bool = False,
+                           fingerprint_using: str = 'voltage',
                            burn_in: Optional[Union[int, float]] = None, min_repetitions: int = 3,
                            flat_signal_threshold: float = 1e-3,
                            num_peaks: int = 3, min_peak_prominence: float = 0.1,
@@ -285,6 +288,8 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         times (np.ndarray): A 1D array of time stamps corresponding to the data points.
         superimpose (bool): Instead of doing a PCA reduction, simply superimpose all neuron voltages into one signal using max. 
             (Default is False)
+        use_lcm (bool): Whether to use the least common multiple of individual neuron periods to determine the overall period.
+            If False, uses the dominant frequency from the combined signal. (Default is False)
         fingerprint_using (str): The method to use for generating the fingerprint of the attractor.
             Options are 'voltage' (using the voltage trace) or 'firing' (using the firing rate).
             Default is 'voltage'.
@@ -328,55 +333,86 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         raise ValueError("Data must be uniformly sampled in time.")
     dt = dt[0]
 
-    # If there is more than one neuron, there is no way to know which one to use for period estimation
-    # or otherwise use all of them in some way. Therefore, we use PCA to reduce to 1D which captures the main variation.
     num_neurons = fired_history.shape[1]
-    if num_neurons > 1:
-        if superimpose: 
+    if use_lcm and num_neurons > 1:
+        if printouts:
+            print("Using LCM of individual neuron periods to determine overall period.")
+        # Estimate the period for each neuron individually
+        individual_periods = []
+        for i in range(num_neurons):
+            signal = voltage_history[:, i]
+            if np.std(signal) < flat_signal_threshold:
+                continue
+            fft_vals = np.fft.rfft(signal - np.mean(signal))
+            fft_freq = np.fft.rfftfreq(len(signal), d=dt)
+            dominant_freq_hz = fft_freq[np.argmax(np.abs(fft_vals[1:])) + 1]
+            if dominant_freq_hz > 0:
+                period_ms = (1.0 / dominant_freq_hz)
+                period_steps = int(period_ms / dt)
+                individual_periods.append(period_steps)
+        if len(individual_periods) == 0:
             if printouts:
-                print(f"Found more than one neuron ({num_neurons}). Superimposing all neuron voltages using max to reduce to 1D for period estimation.")
-            signal = np.max(voltage_history, axis=1)
+                print("No significant periods found for any neuron. This is likely a point attractor.")
+            if fingerprint_using == 'firing':
+                return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
+            else: # fingerprint_using == 'voltage'
+                return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
+        # Compute the LCM of the individual periods
+        def lcm(a, b):
+            return abs(a * b) // gcd(a, b)
+        overall_period_steps = reduce(lcm, individual_periods)
+        if printouts:
+            print(f"Estimated overall attractor period using LCM: {overall_period_steps * dt:.2f} ms ({overall_period_steps} steps)")
+        
+        estimated_period_steps = overall_period_steps
+    else:
+        if num_neurons > 1:
+            if superimpose: 
+                if printouts:
+                    print(f"Found more than one neuron ({num_neurons}). Superimposing all neuron voltages using max to reduce to 1D for period estimation.")
+                signal = np.max(voltage_history, axis=1)
+            else:
+                if printouts:
+                    print(f"Found more than one neuron ({num_neurons}). Using PCA to reduce to 1D for period estimation.")
+                pca = PCA(n_components=1)
+                signal = pca.fit_transform(voltage_history).flatten()
+        else:
+            signal = voltage_history[:, 0]
+
+        # Check is the signal has meaningful variation
+        if np.std(signal) < flat_signal_threshold: # Threshold for a "flat" signal in mV
+            if printouts:
+                print("Signal has very low variation. This is probably a point attractor.")
+            if fingerprint_using == 'firing':
+                return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
+            else: # fingerprint_using == 'voltage'
+                return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
+
+        # If there is variation, proceed with FFT
+        # Compute the frequency spectrum and find the dominant frequency
+        fft_vals = np.fft.rfft(signal - np.mean(signal))
+        fft_freq = np.fft.rfftfreq(len(signal), d=dt) # the frequencies are in kHz if dt is in ms
+        # Ignore the DC component (0 Hz) when searching for the dominant frequency
+        dominant_freq_hz = fft_freq[np.argmax(np.abs(fft_vals[1:])) + 1] # Avoid DC component, therefore 1:
+        
+        if dominant_freq_hz > 0:
+            # Convert frequency to period in ms, where period = 1/frequency
+            period_ms = (1.0 / dominant_freq_hz)
+            # Convert period in ms to number of time steps
+            period_steps = int(period_ms / dt)
+            estimated_period_steps = period_steps
+            if printouts:
+                print(f"Estimated attractor period: {period_ms:.2f} ms ({period_steps} steps)")
         else:
             if printouts:
-                print(f"Found more than one neuron ({num_neurons}). Using PCA to reduce to 1D for period estimation.")
-            pca = PCA(n_components=1)
-            signal = pca.fit_transform(voltage_history).flatten()
-    else:
-        signal = voltage_history[:, 0]
+                print("No dominant frequency found. This is likely a point attractor.")
+            if fingerprint_using == 'firing':
+                return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
+            else: # fingerprint_using == 'voltage'
+                return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
 
-    # Check is the signal has meaningful variation
-    if np.std(signal) < flat_signal_threshold: # Threshold for a "flat" signal in mV
-        if printouts:
-            print("Signal has very low variation. This is probably a point attractor.")
-        if fingerprint_using == 'firing':
-            return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
-        else: # fingerprint_using == 'voltage'
-            return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
-
-    # If there is variation, proceed with FFT
-    # Compute the frequency spectrum and find the dominant frequency
-    fft_vals = np.fft.rfft(signal - np.mean(signal))
-    fft_freq = np.fft.rfftfreq(len(signal), d=dt) # the frequencies are in kHz if dt is in ms
-    # Ignore the DC component (0 Hz) when searching for the dominant frequency
-    dominant_freq_hz = fft_freq[np.argmax(np.abs(fft_vals[1:])) + 1] # Avoid DC component, therefore 1:
-    
-    if dominant_freq_hz > 0:
-        # Convert frequency to period in ms, where period = 1/frequency
-        period_ms = (1.0 / dominant_freq_hz)
-        # Convert period in ms to number of time steps
-        period_steps = int(period_ms / dt)
-        if printouts:
-            print(f"Estimated attractor period: {period_ms:.2f} ms ({period_steps} steps)")
-    else:
-        if printouts:
-            print("No dominant frequency found. This is likely a point attractor.")
-        if fingerprint_using == 'firing':
-            return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
-        else: # fingerprint_using == 'voltage'
-            return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
-
-    # check that period_steps gives enough data for min_repetitions
-    if period_steps * min_repetitions > len(times):
+    # check that estimated_period_steps gives enough data for min_repetitions
+    if estimated_period_steps * min_repetitions > len(times):
         if printouts:
             print(f"Not enough data to cover {min_repetitions} repetitions of the estimated period. Cannot characterize attractor using this period.")
         return None
@@ -384,14 +420,14 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
     # Finding the fingerprint based on the estimated period
     # Characterize the last full period of the simulation
     end_idx = len(times)
-    start_idx = end_idx - period_steps
+    start_idx = end_idx - estimated_period_steps
     if start_idx < 0:
         if printouts:
             print("Not enough data to cover one full period. Cannot characterize attractor.")
         return None
     
     if fingerprint_using == 'firing':
-        fingerprint = characterize_attractor_spikes(fired_history[start_idx:end_idx, :], 0, period_steps)    
+        fingerprint = characterize_attractor_spikes(fired_history[start_idx:end_idx, :], 0, estimated_period_steps)    
     else: # fingerprint_using == 'voltage'
         fingerprint = characterize_attractor_voltage(voltage_history[start_idx:end_idx, :], dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
     if printouts:
@@ -406,7 +442,8 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
                                 burn_in_rate: float = 0.5, min_repetitions: int = 3, min_points: int = 100,
                                 time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 2,
                                 det_threshold: float = 0.2, metric: str = 'euclidean',
-                                fingerprint_using: str = 'voltage', superimpose: bool = True,
+                                fingerprint_using: str = 'voltage', superimpose: bool = False,
+                                use_lcm: bool = True,
                                 flat_signal_threshold: float = 1e-3,
                                 num_peaks: int = 3, min_peak_prominence: float = 0.1,
                                 printouts: bool = True, verbose: bool = False) -> Optional[str]:
@@ -452,7 +489,9 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
             Options are 'voltage' (using the voltage trace) or 'firing' (using the firing rate).
             Default is 'voltage'.
         superimpose (bool): Instead of doing a PCA reduction, simply superimpose all neuron voltages into one signal using max. 
-            (Default is True)
+            (Default is False)
+        use_lcm (bool): Whether to use the least common multiple of individual neuron periods to determine the overall period.
+            If False, uses the dominant frequency from the combined signal. (Default is True)
         flat_signal_threshold (float): Threshold for standard deviation to consider a signal as "flat" (in mV).
         num_peaks (int): The maximum number of frequency peaks to include for each neuron when using voltage fingerprinting.
         min_peak_prominence (float): The minimum prominence for a peak in the frequency spectrum to be 
@@ -518,6 +557,7 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
             if printouts:
                 print(f"Significant determinism detected (DET={rqa_result.determinism:.3f}). Attempting to characterize attractors.")
             fingerprint = fingerprint_attractors(uniform_voltage_history, uniform_fired_history, uniform_times, superimpose=superimpose,
+                                                 use_lcm=use_lcm,
                                                  fingerprint_using=fingerprint_using, flat_signal_threshold=flat_signal_threshold,
                                                  num_peaks=num_peaks, min_peak_prominence=min_peak_prominence,
                                                  burn_in=burn_in, min_repetitions=min_repetitions, printouts=printouts)

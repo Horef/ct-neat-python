@@ -20,7 +20,7 @@ iznn_nodes = {1: n1, 2: n2}
 
 net = ctneat.iznn.IZNN(iznn_nodes, [0], [1, 2])
 
-init0 = 0
+init0 = 2
 
 net.set_inputs([init0])
 
