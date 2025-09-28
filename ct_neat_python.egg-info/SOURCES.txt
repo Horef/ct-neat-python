@@ -1,6 +1,6 @@
 LICENSE
 README.md
-setup.py
+pyproject.toml
 ct_neat_python.egg-info/PKG-INFO
 ct_neat_python.egg-info/SOURCES.txt
 ct_neat_python.egg-info/dependency_links.txt
@@ -25,9 +25,12 @@ ctneat/species.py
 ctneat/stagnation.py
 ctneat/statistics.py
 ctneat/threaded.py
+ctneat/api/iznn_api.py
 ctneat/ctrnn/__init__.py
 ctneat/ctrnn/ctrnn_visualize.py
 ctneat/iznn/__init__.py
+ctneat/iznn/auxillary_funcs.py
+ctneat/iznn/dynamic_attractors.py
 ctneat/nn/__init__.py
 ctneat/nn/feed_forward.py
 ctneat/nn/recurrent.py
