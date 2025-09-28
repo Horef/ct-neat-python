@@ -14,12 +14,16 @@ For further information regarding general concepts and theory, please see the
 Florida (now somewhat dated), or the [publications page](https://www.kenstanley.net/papers) of his current website. (rtNEAT would be relevant for the CT element.)
 
 `ct-neat-python` is licensed under the [3-clause BSD license](https://opensource.org/licenses/BSD-3-Clause).  It is
-currently supported on Python 3.6 through 3.11, and pypy3.
+currently supported on Python 3.8 through 3.12, and pypy3.
 
 ## Getting Started ##
-
 If you want to try ct-neat-python, please check out the repository, start playing with the examples (`examples/xor` is
 a good place to start) and then try creating your own experiment.
+
+The package can be install from PyPI using:
+```
+pip install ct-neat-python
+```
 
 The documentation is available on [Read The Docs](http://neat-python.readthedocs.io).
 
