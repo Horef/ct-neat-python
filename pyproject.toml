@@ -37,6 +37,9 @@ dependencies = [
     "numpy",
     "scipy",
     "joblib",
+    "matplotlib",
+    "scikit-learn",
+    "graphviz",
 ]
 
 [project.urls]
