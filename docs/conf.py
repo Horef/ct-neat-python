@@ -24,12 +24,13 @@ sys.path.insert(0, os.path.abspath('../neat'))
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-needs_sphinx = '1.5'
+# needs_sphinx = '1.5'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'sphinx.ext.napoleon',
     'sphinx.ext.mathjax',
     'sphinx.ext.githubpages',
     'sphinx.ext.autodoc',
@@ -42,14 +43,14 @@ extensions = [
     'sphinx.ext.inheritance_diagram', 
 ]
 
-extlinks = {'pytypes': ('https://docs.python.org/3.5/library/stdtypes.html#%s',
-                        ''),
-            'pygloss': ('https://docs.python.org/3.5/glossary.html#term-%s',
-                        ''),
-            'datamodel': ('https://docs.python.org/3.5/reference/datamodel.html#%s',
-                          ''),
-            'pylib': ('https://docs.python.org/3.5/library/%s',
-                      '')}
+extlinks = {'pytypes': ('https://docs.python.org/3/library/stdtypes.html#%s',
+                        '%s'),
+            'pygloss': ('https://docs.python.org/3/glossary.html#term-%s',
+                        '%s'),
+            'datamodel': ('https://docs.python.org/3/reference/datamodel.html#%s',
+                          '%s'),
+            'pylib': ('https://docs.python.org/3/library/%s',
+                      '%s')}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -131,7 +132,7 @@ else:
     todo_include_todos = False
 
 # Provide links to python3.5 documentation
-intersphinx_mapping = {'python': ('https://docs.python.org/3.5', None)}
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 # -- Options for HTML output ----------------------------------------------
 
