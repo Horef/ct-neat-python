@@ -66,18 +66,19 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'NEAT-Python'
-copyright = u'2015-2019, CodeReclaimers, LLC'
-author = u'CodeReclaimers, LLC'
+project = u'CT-NEAT-Python'
+copyright = u'2025, Sergiy Horef'
+author = u'Sergiy Horef'
+release = u'28.09.2025'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-# The short X.Y version.
-version = '0.92'
+# The short X.Y.Z version.
+version = '1.0.0'
 # The full version, including alpha/beta/rc tags.
-release = '0.92'
+release = '1.0.0'
 
 if version != release:
     tags.add('draft')
@@ -136,7 +137,7 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3.5', None)}
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-#html_theme = 'alabaster'
+html_theme = 'furo'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -154,7 +155,7 @@ html_theme_options = {
 #html_title = None
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
-html_short_title = "NEAT-Python documentation"
+html_short_title = "CT-NEAT-Python documentation"
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
@@ -233,7 +234,7 @@ html_last_updated_fmt = '%b %d, %Y'
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'NEAT-Pythondoc'
+htmlhelp_basename = 'CT-NEAT-Pythondoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
