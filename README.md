@@ -25,7 +25,7 @@ The package can be install from PyPI using:
 pip install ct-neat-python
 ```
 
-The documentation is available on [Read The Docs](http://neat-python.readthedocs.io).
+The documentation is available on [Read The Docs](https://ct-neat-python.readthedocs.io).
 
 If you want to contribute to the directory and run the code in a developer setting, run the following from the root of the project:
 ```

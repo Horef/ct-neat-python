@@ -37,6 +37,7 @@ Contents:
    module_summaries
    genome-interface
    reproduction-interface
+   docstrings
    glossary
 
 Indices and tables

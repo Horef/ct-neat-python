@@ -8,7 +8,7 @@ import graphviz
 from sklearn.decomposition import PCA
 from typing import Optional, Union
 
-def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = False, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
+def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = False, dir_name: Optional[str] = 'ctneat_outputs', file_name: Optional[str] = None) -> None:
     """
     This function draws the CTRNN network structure.
     Args:
@@ -35,7 +35,7 @@ def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = Fa
 
 def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Optional[Union[np.ndarray, list]] = None, 
                         iznn: Optional[bool] = False, save: bool = False, show: bool = True, 
-                        dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
+                        dir_name: Optional[str] = 'ctneat_outputs', file_name: Optional[str] = None) -> None:
     """
     This function draws the dynamics of the CTRNN over time.
     Args:
@@ -69,11 +69,13 @@ def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Op
 
     plt.legend(loc="best")
     if save:
-        plt.savefig(f"{dir_name + '/' if dir_name else ''}{file_name or 'iznn_dynamics' if iznn else 'ctrnn_dynamics'}.png")
+        plt.savefig(f"{dir_name + '/' if dir_name else '.'}{file_name or 'iznn_dynamics' if iznn else 'ctrnn_dynamics'}.png")
     if show:
         plt.show()
 
-def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optional[bool] = False, save: bool = False, show: bool = True, dir_name: Optional[str] = None, file_name: Optional[str] = None) -> None:
+def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optional[bool] = False, 
+                          save: bool = False, show: bool = True, dir_name: Optional[str] = 'ctneat_outputs', 
+                          file_name: Optional[str] = None) -> None:
     """
     This function draws a trajectory of the CTRNN's state space.
     If there are more than 'n_components' nodes, the PCA is used to reduce the dimensionality to 'n_components'.
