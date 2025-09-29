@@ -1,2 +1,7 @@
+# Install the project itself from the parent directory in editable mode.
+# This makes `ctneat` importable and installs its dependencies.
+-e ..
+
 # Python packages required to build the documentation
+sphinx
 furo
