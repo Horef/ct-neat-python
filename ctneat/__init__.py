@@ -1,4 +1,6 @@
-"""A CT-NEAT (Continuous Time NeuroEvolution of Augmenting Topologies) implementation"""
+"""
+A CT-NEAT (Continuous Time NeuroEvolution of Augmenting Topologies) implementation
+"""
 import ctneat.nn as nn
 import ctneat.ctrnn as ctrnn
 import ctneat.iznn as iznn
