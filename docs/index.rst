@@ -1,15 +1,18 @@
-Welcome to NEAT-Python's documentation!
-=======================================
+Welcome to CT-NEAT-Python's documentation!
+==========================================
 
 :abbr:`NEAT (NeuroEvolution of Augmenting Topologies)` is a method developed by Kenneth O. Stanley for evolving arbitrary neural
-networks. NEAT-Python is a pure Python implementation of NEAT, with no dependencies other than the Python standard library.
+networks. :abbr:`CT-NEAT (Continuous-Time NEAT)` is an extension of NEAT for evolving continuous-time recurrent neural networks (CTRNNs),
+also developed by Stanley.
+CT-NEAT-Python is a Python implementation of CT-NEAT, with minimal dependencies beyond the standard library.
 
-Currently this library supports Python versions 3.6 through 3.11, as well as PyPy 3.
+Currently this library supports Python versions 3.8 through 3.13, as well as PyPy 3.
 
-Many thanks to the original authors of this implementation, Cesar Gomes Miguel, Carolina Feher da Silva, and Marcio Lobo Netto!
+Many thanks to the authors of the original implementation: Cesar Gomes Miguel, Carolina Feher da Silva, and Marcio Lobo Netto.
+And the later work and development by CodeReclaimers (on GitHub) - Alan and Kallada McIntyre, Matt and Miguel.
 
 .. note::
-  Some of the example code has other dependencies. For your convenience there is a conda environment YAML file in the
+  Some of the example code has additional dependencies. For your convenience there is a conda environment YAML file in the
   examples directory you can use to set up an environment that will support all of the current examples.
   TODO: Improve README.md file information for the examples.
 
@@ -18,7 +21,7 @@ For further information regarding general concepts and theory, please see `Selec
 <https://www.reddit.com/r/IAmA/comments/3xqcrk/im_ken_stanley_artificial_intelligence_professor>`_.
 
 If you encounter any confusing or incorrect information in this documentation, please open an issue in the `GitHub project
-<https://github.com/CodeReclaimers/neat-python>`_.
+<https://github.com/Horef/ct-neat-python>`_.
 
 .. _toc-label:
 
