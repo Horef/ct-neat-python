@@ -37,8 +37,10 @@ def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Opti
                 'voltages' - returns the membrane potentials (in millivolts)
                 'recovery' - returns the recovery variables (in millivolts)
             Default is 'voltages'.
+    
     Returns:
         A tuple (uniform_times, uniform_data)
+    
     Raises:
         ValueError: If dt_uniform_ms is invalid or if using_simulation is True but no network is provided.
     """
@@ -111,6 +113,7 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
 
     Returns:
         None
+    
     Raises:
         ValueError: If an unsupported metric is provided.
     """
@@ -337,10 +340,12 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         min_peak_prominence (float): The minimum prominence for a peak in the frequency spectrum to be 
             considered when using voltage fingerprinting. This helps filter out noise.
         printouts (bool): Whether to print summarized analysis information.
+    
     Returns:
         Optional[str]: A string representing the spike pattern of the attractor, or None if no attractor is found.
             In case of voltage fingerprinting, the string represents the frequency components of each neuron.
             In case of firing fingerprinting, the string represents the firing pattern of the attractor.
+    
     Raises:
         ValueError: If the input arrays have incompatible shapes or if the time data is not uniformly sampled.
         ValueError: If fingerprint_using is not recognized.
@@ -535,6 +540,7 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
             considered when using voltage fingerprinting. This helps filter out noise.
         printouts (bool): If True, prints summary information about the analysis.
         verbose (bool): If True, prints detailed information during the analysis. (If set to true, also enables printouts.)
+    
     Returns:
         Optional[Union[str, List[float]]]: A string representing the spike pattern of the attractor, or None if no attractor can be found.
             Neurons that fire at each time step are listed, separated by commas, and time steps are separated by hyphens.
@@ -542,6 +548,7 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
             In case of voltage fingerprinting, the string represents the frequency components of each neuron.
             If fingerprint_vec is True and voltage fingerprinting is used, returns a list containing the vector representation of the fingerprint.
             If no attractor is found, returns None.
+    
     Raises:
         ValueError: If dt_uniform_ms is invalid or if fingerprint_using is not recognized.
     """

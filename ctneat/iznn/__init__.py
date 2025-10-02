@@ -138,6 +138,7 @@ class IZNeuron(object):
         Args:
             t (float): Current time (not used in this model).
             y (list): A list [v, u] where v is the membrane potential and u is the recovery variable.
+        
         Returns:
             list: A list [dv/dt, du/dt].
         """
@@ -149,6 +150,7 @@ class IZNeuron(object):
     def advance(self, dt_msec: float):
         """
         This is a default advance method which is simply a wrapper to the advance_scipy method.
+
         Args:
             dt_msec (float): The time step in milliseconds.
         """
@@ -348,7 +350,8 @@ class IZNN(object):
 
     def advance(self, dt_msec: float, method: Optional[str] = 'LSODA', events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """
-        Advances the simulation by the given time step in milliseconds.)
+        Advances the simulation by the given time step in milliseconds.
+
         Args:
             dt_msec (float): The time step in milliseconds.
             method (str): The integration method to use. If None, uses manually written RK4, otherwise defaults to SciPy's LSODA.
@@ -375,8 +378,10 @@ class IZNN(object):
                     'voltages' - returns the membrane potentials (in millivolts)
                     'recovery' - returns the recovery variables
                     'all' - returns a list of lists: [fired states, voltages, recovery variables]
+        
         Returns:
             A list or a list of lists as specified by the 'ret' parameter.
+        
         Raises:
             ValueError: If an invalid integration method is specified.
         """
@@ -388,6 +393,7 @@ class IZNN(object):
     def advance_simple(self, dt_msec, method: Optional[str] = 'LSODA', events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """
         Advances the simulation by the given time step in milliseconds.
+
         Args:
             dt_msec (float): The time step in milliseconds.
             method (str): The integration method to use. If None, uses manually written RK4, otherwise defaults to SciPy's LSODA.
@@ -411,8 +417,10 @@ class IZNN(object):
                     'voltages' - returns the membrane potentials (in millivolts)
                     'recovery' - returns the recovery variables
                     'all' - returns a list of lists: [fired states, voltages, recovery variables]
+        
         Returns:
             A list or a list of lists as specified by the 'ret' parameter.
+        
         Raises:
             ValueError: If an invalid integration method is specified.
         """
@@ -492,6 +500,7 @@ class IZNN(object):
         Returns:
             A list or a list of lists as specified by the 'ret' parameter, representing
             the state of the output neurons after the time step.
+        
         Raises:
             ValueError: If an invalid integration method is specified.
         """

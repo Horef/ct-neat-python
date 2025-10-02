@@ -39,7 +39,6 @@ Contents:
    customization
    activation
    ctrnn
-   module_summaries
    genome-interface
    reproduction-interface
    docstrings

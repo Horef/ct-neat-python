@@ -11,6 +11,7 @@ from typing import Optional, Union
 def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = False, dir_name: Optional[str] = 'ctneat_outputs', file_name: Optional[str] = None) -> None:
     """
     This function draws the CTRNN network structure.
+
     Args:
         node_list: A list of node IDs in the network.
         node_inputs: A dictionary where keys are node IDs and values are lists of input connections for each node.
@@ -18,6 +19,7 @@ def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = Fa
         iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         dir_name: Optional directory name to save the output file. If None, saves in the current directory.
         file_name: Optional file name to save the output file. If None, defaults to 'ctrnn_network'.
+    
     Returns:
         None
     """
@@ -38,6 +40,7 @@ def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Op
                         dir_name: Optional[str] = 'ctneat_outputs', file_name: Optional[str] = None) -> None:
     """
     This function draws the dynamics of the CTRNN over time.
+
     Args:
         states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
             and each column corresponds to a specific node's state.
@@ -49,6 +52,7 @@ def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Op
         show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.
         dir_name: Optional directory name to save the output file. If None, saves in the current directory.
         file_name: Optional file name to save the output file. If None, defaults to 'ctrnn_dynamics'.
+
     Returns:
         None
     """
@@ -79,6 +83,7 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
     """
     This function draws a trajectory of the CTRNN's state space.
     If there are more than 'n_components' nodes, the PCA is used to reduce the dimensionality to 'n_components'.
+
     Args:
         states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
         and each column corresponds to a specific node's state.
@@ -88,8 +93,10 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
         show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.
         dir_name: Optional directory name to save the output file. If None, saves in the current directory.
         file_name: Optional file name to save the output file. If None, defaults to 'ctrnn_face_portrait'.
+    
     Returns:
         None
+    
     Raises:
         ValueError: If n_components is not 1, 2, or 3.
     """
