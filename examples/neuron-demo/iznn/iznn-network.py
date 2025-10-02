@@ -20,7 +20,7 @@ iznn_nodes = {1: n1, 2: n2}
 
 net = ctneat.iznn.IZNN(iznn_nodes, [0], [1, 2])
 
-init0 = 2
+init0 = 1
 
 net.set_inputs([init0])
 
@@ -57,5 +57,5 @@ draw_ctrnn_dynamics(uniform_voltage_history, uniform_time=True, iznn=True, save=
 draw_ctrnn_trajectory(uniform_voltage_history, n_components=2, iznn=True, save=True, show=False)
 
 dynamic_attractors_pipeline(voltage_history=uniform_voltage_history, fired_history=uniform_fired_history, times_np=uniform_time_steps,
-                            variable_burn_in=True)
+                            variable_burn_in=True, fingerprint_vec=True)
 

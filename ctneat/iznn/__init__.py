@@ -568,6 +568,28 @@ class IZNN(object):
         else:
             return out_neurons_firing
 
+    @property
+    def get_state(self) -> Dict[int, Tuple[float, float, float]]:
+        """
+        Returns the current state of the network as a dictionary mapping neuron IDs to their (v, u, fired) state.
+        """
+        return {nid: (n.v, n.u, n.fired) for nid, n in self.neurons.items()}
+    
+    @property
+    def get_fired(self) -> List[float]:
+        """Returns a list of firing states for all output neurons."""
+        return [self.neurons[i].fired for i in self.outputs]
+
+    @property
+    def get_voltages(self) -> List[float]:
+        """Returns a list of voltage states for all output neurons."""
+        return [self.neurons[i].v for i in self.outputs]
+    
+    @property
+    def get_recovery(self) -> List[float]:
+        """Returns a list of recovery variable states for all output neurons."""
+        return [self.neurons[i].u for i in self.outputs]
+
     @staticmethod
     def create(genome, config):
         """ Receives a genome and returns its phenotype (a neural network). """

@@ -1,4 +1,4 @@
-from typing import Optional, Union, Tuple
+from typing import Optional, Union, Tuple, List
 from ctneat.iznn import IZNN
 from pyrqa.time_series import TimeSeries
 from pyrqa.settings import Settings
@@ -162,7 +162,7 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
     return result
 
 
-def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end: int) -> str:
+def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end: int, return_vec: bool = False) -> Union[str, List[int]]:
     """
     Creates a spike pattern string for a detected attractor period.
     
@@ -170,14 +170,17 @@ def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end
         fired_history (np.ndarray): A 2D array (time steps x neurons) of firing states (1.0 or 0.0).
         t_start (int): The starting time index of the attractor cycle.
         t_end (int): The ending time index of the attractor cycle.
+        return_vec (bool): If True, returns a vector representation of the fingerprint instead of a string.
         
     Returns:
         str: A string representing the spike pattern. Neurons that fire at each time step are listed,
              separated by commas, and time steps are separated by hyphens. Non-firing steps are denoted by '_'.
+        list: If return_vec is True, returns a list containing the vector representation of the fingerprint.
     """
     # taking only the spikes during the attractor period
     attractor_spikes = fired_history[t_start:t_end, :]
     fingerprint = []
+    fingerprint_vec = []
     for t in range(attractor_spikes.shape[0]):
         # for each time step, find which neurons fired
         spiking_neurons = np.where(attractor_spikes[t, :] > 0.5)[0]
@@ -186,14 +189,22 @@ def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end
         else:
             # if no neurons fired, denote with '_'
             fingerprint.append("_")
+        if return_vec:
+            step_vec = [0]*attractor_spikes.shape[1]
+            for neuron in spiking_neurons:
+                step_vec[neuron] = 1
+            fingerprint_vec.extend(step_vec)
     # combine the time steps with '-'
+    if return_vec:
+        return fingerprint_vec
     return "-".join(fingerprint)
 
 
 def characterize_attractor_voltage(voltage_history_cycle: np.ndarray, 
                                      dt: float, 
                                      num_peaks: int = 3, 
-                                     min_peak_prominence: float = 0.1) -> str:
+                                     min_peak_prominence: float = 0.1,
+                                     return_vec: bool = False) -> Union[str, List[float]]:
     """
     Creates a voltage-based fingerprint for an attractor cycle that is invariant
     to neuron order.
@@ -212,6 +223,7 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
         min_peak_prominence (float): The minimum prominence for a peak in the
                                      frequency spectrum to be considered. This helps
                                      filter out noise.
+        return_vec (bool): If True, returns a vector representation of the fingerprint instead of a string.
 
     Returns:
         str: A canonical fingerprint string of the attractor's voltage dynamics in the form:
@@ -221,6 +233,15 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
             If the number of time steps is zero, returns "no_data".
             If a neuron's voltage is flat (no significant peaks), 
             it is denoted as N<neuron_id>(flat, v:<last_voltage>).
+        list: If return_vec is True, returns a list containing the vector representations of the fingerprints.
+            The length of the list will be num_neurons * (2 * num_peaks + 1), where each neuron contributes
+            num_peaks frequency-magnitude pairs and one last voltage value (only set in the flat case).
+            For the previous example, the vector would be: 
+            [10.5, 2.3, 21.0, 1.1, 0.0, 
+             9.8, 1.5, 20.5, 0.9, 0.0]
+            In case of a flat signal with voltages of v1 and v2, the vector would be:
+            [0.0, 0.0, 0.0, 0.0, v1,
+             0.0, 0.0, 0.0, 0.0, v2]
     """
     num_steps, num_neurons = voltage_history_cycle.shape
     if num_steps == 0:
@@ -228,6 +249,8 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
 
     # A list to hold the fingerprint string of each neuron
     neuron_fingerprints = []
+    # In case of return_vec, we will hold the vector representations here
+    neuronal_fingerprint_vecs = []
 
     for i in range(num_neurons):
         signal = voltage_history_cycle[:, i]
@@ -243,6 +266,8 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
         if len(peaks) == 0:
             # If no significant peaks, characterize as flat
             neuron_fingerprints.append(f"N{i+1}(flat,v:{signal[-1]:.2f})")
+            neuronal_fingerprint_vecs.extend([0.0]*num_peaks)
+            neuronal_fingerprint_vecs.append(signal[-1])
             continue
 
         # Get the power of the found peaks
@@ -261,22 +286,32 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
         # Format into a string, e.g., "f:10.5,m:2.3|f:21.0,m:1.1"
         peak_str = "|".join([f"f:{freq:.1f},m:{mag:.2f}" for freq, mag in peak_info])
         neuron_fingerprints.append(f"N{i+1}({peak_str})")
+        if return_vec:
+            for freq, mag in peak_info:
+                neuronal_fingerprint_vecs.extend([freq, mag])
+            # If fewer than num_peaks were found, pad with zeros
+            if len(peak_info) < num_peaks:
+                neuronal_fingerprint_vecs.extend([0.0] * (2 * (num_peaks - len(peak_info))))
 
     # CRUCIAL STEP: Sort the individual neuron fingerprints alphabetically.
     # This makes the final fingerprint invariant to the original neuron order.
     # e.g., ['N1(..)', 'N0(..)'] will become ['N0(..)', 'N1(..)']
     neuron_fingerprints.sort()
-    
+
+    if return_vec:
+        # If return_vec is True, return the concatenated vector representations.
+        return neuronal_fingerprint_vecs
+
     return "-".join(neuron_fingerprints)
 
 
 def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarray, times: np.ndarray,
                            superimpose: bool = False, use_lcm: bool = False,
-                           fingerprint_using: str = 'voltage',
+                           fingerprint_using: str = 'voltage', fingerprint_vec: bool = False,
                            burn_in: Optional[Union[int, float]] = None, min_repetitions: int = 3,
                            flat_signal_threshold: float = 1e-3,
                            num_peaks: int = 3, min_peak_prominence: float = 0.1,
-                           printouts: bool = False) -> Optional[str]:
+                           printouts: bool = False) -> Optional[Union[str, List[float]]]:
     """
     Analyzes the voltage and firing history to identify and characterize attractor periods.
     It estimates the dominant period using FFT (Fast Fourier Transform) and then characterizes the spike pattern
@@ -293,6 +328,7 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
         fingerprint_using (str): The method to use for generating the fingerprint of the attractor.
             Options are 'voltage' (using the voltage trace) or 'firing' (using the firing rate).
             Default is 'voltage'.
+        fingerprint_vec (bool): If True, returns a vector representation of the fingerprint instead of a string.
         burn_in (Optional[Union[int, float]]): Number of initial time steps to discard from the analysis. 
             If float, treated as percentage. If int, treated as absolute number of steps. If None, defaults to 0.
         min_repetitions (int): Minimum number of repetitions of the attractor cycle to confirm its presence.
@@ -356,7 +392,7 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
             if fingerprint_using == 'firing':
                 return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
             else: # fingerprint_using == 'voltage'
-                return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
+                return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence, return_vec=fingerprint_vec)
         # Compute the LCM of the individual periods
         def lcm(a, b):
             return abs(a * b) // gcd(a, b)
@@ -409,7 +445,7 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
             if fingerprint_using == 'firing':
                 return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
             else: # fingerprint_using == 'voltage'
-                return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
+                return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence, return_vec=fingerprint_vec)
 
     # check that estimated_period_steps gives enough data for min_repetitions
     if estimated_period_steps * min_repetitions > len(times):
@@ -429,7 +465,7 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
     if fingerprint_using == 'firing':
         fingerprint = characterize_attractor_spikes(fired_history[start_idx:end_idx, :], 0, estimated_period_steps)    
     else: # fingerprint_using == 'voltage'
-        fingerprint = characterize_attractor_voltage(voltage_history[start_idx:end_idx, :], dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
+        fingerprint = characterize_attractor_voltage(voltage_history[start_idx:end_idx, :], dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence, return_vec=fingerprint_vec)
     if printouts:
         print(f"Attractor fingerprint: {fingerprint}")
     return fingerprint
@@ -442,11 +478,11 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
                                 burn_in_rate: float = 0.5, min_repetitions: int = 3, min_points: int = 100,
                                 time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 2,
                                 det_threshold: float = 0.2, metric: str = 'euclidean',
-                                fingerprint_using: str = 'voltage', superimpose: bool = False,
-                                use_lcm: bool = True,
+                                fingerprint_using: str = 'voltage', fingerprint_vec: bool = False,
+                                superimpose: bool = False, use_lcm: bool = True,
                                 flat_signal_threshold: float = 1e-3,
                                 num_peaks: int = 3, min_peak_prominence: float = 0.1,
-                                printouts: bool = True, verbose: bool = False) -> Optional[str]:
+                                printouts: bool = True, verbose: bool = False) -> Optional[Union[str, List[float]]]:
     """
     Full pipeline to analyze dynamic attractors in IZNN data.
     This includes resampling to uniform time steps, performing RQA, and characterizing attractors.
@@ -488,6 +524,7 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
         fingerprint_using (str): The method to use for generating the fingerprint of the attractor.
             Options are 'voltage' (using the voltage trace) or 'firing' (using the firing rate).
             Default is 'voltage'.
+        fingerprint_vec (bool): If True, returns a vector representation of the fingerprint instead of a string.
         superimpose (bool): Instead of doing a PCA reduction, simply superimpose all neuron voltages into one signal using max. 
             (Default is False)
         use_lcm (bool): Whether to use the least common multiple of individual neuron periods to determine the overall period.
@@ -499,8 +536,12 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
         printouts (bool): If True, prints summary information about the analysis.
         verbose (bool): If True, prints detailed information during the analysis. (If set to true, also enables printouts.)
     Returns:
-        Optional[str]: A string representing the spike pattern of the attractor, or None if no attractor can be found.
+        Optional[Union[str, List[float]]]: A string representing the spike pattern of the attractor, or None if no attractor can be found.
             Neurons that fire at each time step are listed, separated by commas, and time steps are separated by hyphens.
+            Non-firing steps are denoted by '_'.
+            In case of voltage fingerprinting, the string represents the frequency components of each neuron.
+            If fingerprint_vec is True and voltage fingerprinting is used, returns a list containing the vector representation of the fingerprint.
+            If no attractor is found, returns None.
     Raises:
         ValueError: If dt_uniform_ms is invalid or if fingerprint_using is not recognized.
     """
@@ -557,8 +598,8 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
             if printouts:
                 print(f"Significant determinism detected (DET={rqa_result.determinism:.3f}). Attempting to characterize attractors.")
             fingerprint = fingerprint_attractors(uniform_voltage_history, uniform_fired_history, uniform_times, superimpose=superimpose,
-                                                 use_lcm=use_lcm,
-                                                 fingerprint_using=fingerprint_using, flat_signal_threshold=flat_signal_threshold,
+                                                 use_lcm=use_lcm, fingerprint_using=fingerprint_using, fingerprint_vec=fingerprint_vec,
+                                                 flat_signal_threshold=flat_signal_threshold,
                                                  num_peaks=num_peaks, min_peak_prominence=min_peak_prominence,
                                                  burn_in=burn_in, min_repetitions=min_repetitions, printouts=printouts)
             

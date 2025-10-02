@@ -6,6 +6,8 @@ NEAT Overview
 :dfn:`NEAT` (NeuroEvolution of Augmenting Topologies) is an evolutionary algorithm that creates artificial neural networks. For a
 detailed description of the algorithm, you should probably go read some of `Stanley's papers
 <http://www.cs.ucf.edu/~kstanley/#publications>`_ on his website.
+:dfn:`CT-NEAT` (Continuous-Time NEAT) is an extension of NEAT for evolving continuous-time recurrent neural networks (CTRNNs),
+also developed by Stanley and can be found in the same place under the rtNEAT (or Recurrent Time NEAT) name.
 
 Even if you just want to get the gist of the algorithm, reading at least a couple of the early NEAT papers is a good
 idea.  Most of them are pretty short, and do a good job of explaining concepts (or at least pointing
@@ -13,7 +15,7 @@ you to other references that will).  `The initial NEAT paper
 <http://nn.cs.utexas.edu/downloads/papers/stanley.cec02.pdf>`_ is only 6 pages long, and Section II should be enough
 if you just want a high-level overview.
 
-In the current implementation of NEAT-Python, a population of individual :term:`genomes <genome>` is maintained.  Each genome contains
+In the current implementation of CT-NEAT-Python, a population of individual :term:`genomes <genome>` is maintained.  Each genome contains
 two sets of :term:`genes <gene>` that describe how to build an artificial neural network:
 
     1. :term:`Node` genes, each of which specifies a single neuron.

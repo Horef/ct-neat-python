@@ -2,7 +2,8 @@ Welcome to CT-NEAT-Python's documentation!
 ==========================================
 
 :abbr:`NEAT (NeuroEvolution of Augmenting Topologies)` is a method developed by Kenneth O. Stanley for evolving arbitrary neural
-networks. :abbr:`CT-NEAT (Continuous-Time NEAT)` is an extension of NEAT for evolving continuous-time recurrent neural networks (CTRNNs),
+networks. 
+:abbr:`CT-NEAT (Continuous-Time NEAT)` is an extension of NEAT for evolving continuous-time recurrent neural networks (CTRNNs),
 also developed by Stanley.
 CT-NEAT-Python is a Python implementation of CT-NEAT, with minimal dependencies beyond the standard library.
 
@@ -32,6 +33,7 @@ Contents:
 
    neat_overview
    installation
+   whats_new
    config_file
    xor_example
    customization
