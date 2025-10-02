@@ -40,10 +40,10 @@ voltage_history = np.array(voltage_history)
 fired_history = np.array(fired_history)
 
 # saving the outputs to a file for later analysis
-with open("iznn-demo-voltage_history.npy", "wb") as f:
+with open("ctneat_outputs/iznn-demo-voltage_history.npy", "wb") as f:
     np.save(f, voltage_history)
 
-with open("iznn-demo-fired_history.npy", "wb") as f:
+with open("ctneat_outputs/iznn-demo-fired_history.npy", "wb") as f:
     np.save(f, fired_history)
 
 
