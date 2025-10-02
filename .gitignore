@@ -1,6 +1,6 @@
 .DS_Store
-.vscode
-.__pycache__
-.pytest_cache
-.ct_neat_python.egg-info
-.ctneat_outputs
+vscode/
+__pycache__/
+pytest_cache/
+ct_neat_python.egg-info/
+ctneat_outputs/
