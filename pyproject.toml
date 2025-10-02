@@ -47,3 +47,8 @@ dependencies = [
 Homepage = "https://github.com/Horef/ct-neat-python"
 Repository = "https://github.com/Horef/ct-neat-python"
 Documentation = "https://ct-neat-python.readthedocs.io"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ctneat*"]
+exclude = ["tests*", "examples*", "docs*"]
