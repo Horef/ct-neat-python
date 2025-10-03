@@ -7,6 +7,7 @@ import numpy as np
 import graphviz
 from sklearn.decomposition import PCA
 from typing import Optional, Union
+import warnings
 
 def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = False, dir_name: Optional[str] = 'ctneat_outputs', file_name: Optional[str] = None) -> None:
     """
@@ -88,6 +89,7 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
         states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
         and each column corresponds to a specific node's state.
         n_components: The number of components to reduce to (default is 2, max is 3).
+            Note that if n_components is equal to 1 and the number of nodes is also 1, this function is equivalent to draw_ctrnn_dynamics.
         iznn: Whether the network is an Izhikevich spiking neural network (IZNN). If True, the function gives correct labels.
         save: Whether to save the plot as a file. If False, the plot is shown interactively.
         show: Whether to display the plot interactively. If False, the plot is only saved to a file if 'save' is True.
@@ -107,8 +109,9 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
         pca = PCA(n_components=n_components)
         reduced_states = pca.fit_transform(states)
     elif states.shape[1] < n_components:
-        reduced_states = states
-        raise RuntimeWarning(f"Cannot reduce to {n_components} components from {states.shape[1]} nodes. Falling back to {states.shape[1]}D.")
+        reduced_states = states.flatten()
+        n_components = states.shape[1]
+        warnings.warn(f"Cannot reduce to {n_components} components from {states.shape[1]} nodes. Falling back to {states.shape[1]}D.", UserWarning)
     else:
         reduced_states = states
 
@@ -119,10 +122,10 @@ def draw_ctrnn_trajectory(states: np.ndarray, n_components: int = 2, iznn: Optio
         plt.ylabel("Principal Component 1")
         plt.grid()
 
-        plt.plot(range(reduced_states.shape[1]), reduced_states[:, 0], color='b', marker='o', markersize=3)
+        plt.plot(range(len(reduced_states)), reduced_states, color='b', marker='o', markersize=3)
         # denoting the start and end points
-        plt.text(range(reduced_states.shape[1])[0], reduced_states[0][0], 'Start', fontsize=12, color='green')
-        plt.text(range(reduced_states.shape[1])[-1], reduced_states[-1][0], 'End', fontsize=12, color='red')
+        plt.text(range(len(reduced_states))[0], reduced_states[0], 'Start', fontsize=12, color='green')
+        plt.text(range(len(reduced_states))[-1], reduced_states[-1], 'End', fontsize=12, color='red')
 
     elif n_components == 2:
         plt.figure(figsize=(10,10))

@@ -9,9 +9,10 @@ from ctneat.iznn.dynamic_attractors import resample_data
 def create_iznn_network(node_params: Union[Dict[int, Dict[str, Any]], Dict[str, Any]],
                         node_inputs: Dict[int, List[Tuple[int, float]]],
                         input_nodes: List[int], output_nodes: List[int],
-                        network_inputs: List[float]) -> IZNN:
+                        network_inputs: Optional[List[float]] = None) -> IZNN:
     """
     Create an IZNN network from given neuron parameters and connections.
+
     Args:
         node_params: Either a dictionary where keys are node IDs and values are dictionaries of neuron parameters,
             or a single dictionary of parameters to be used for all neurons.
@@ -21,9 +22,11 @@ def create_iznn_network(node_params: Union[Dict[int, Dict[str, Any]], Dict[str, 
             (I.e. each list contains tuples of (input_node_id, weight) for the node with the corresponding ID)
         input_nodes: A list of node IDs that are designated as input nodes.
         output_nodes: A list of node IDs that are designated as output nodes.
-        network_inputs: A list of initial input values for the input nodes.
+        network_inputs (Optional[List[float]]): A list of initial input values for the input nodes.
+    
     Returns:
         An instance of the IZNN class representing the created network.
+    
     Example:
         node_inputs = {
             1: [(0, 0.2), (2, -0.2)],
@@ -46,7 +49,8 @@ def create_iznn_network(node_params: Union[Dict[int, Dict[str, Any]], Dict[str, 
         iznn_nodes[node_id] = IZNeuron(**params, inputs=inputs)
 
     net = IZNN(iznn_nodes, input_nodes, output_nodes)
-    net.set_inputs(network_inputs)
+    if network_inputs is not None:
+        net.set_inputs(network_inputs)
 
     return net
 
@@ -55,6 +59,7 @@ def simulate_iznn_network(net: IZNN, time_steps: int, dt_ms: float,
                           uniform: bool = True) -> List[np.ndarray]:
     """
     Simulate the IZNN network for a given number of time steps and time step size.
+
     Args:
         net: An instance of the IZNN class representing the network to be simulated.
         time_steps: The number of time steps to simulate.
@@ -69,10 +74,12 @@ def simulate_iznn_network(net: IZNN, time_steps: int, dt_ms: float,
                     'recovery' - returns the recovery variables
                     'all' - returns a list of lists: [fired states, voltages, recovery variables]
         uniform: Whether to resample the output to uniform time steps. Default is True.
+    
     Returns:
         A list of lists as specified by the 'ret' parameter, representing
             the state of the output neurons after the time step.
         The first element in the list corresponds to the time step array.
+    
     Example:
         times, voltages, fired = simulate_iznn_network(net, time_steps=1000, dt_ms=0.1, ret=['voltages', 'fired'])
     """

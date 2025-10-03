@@ -5,18 +5,18 @@ This module contains the class which is used to discretize continuous network dy
 import numpy as np
 from sklearn.cluster import KMeans, DBSCAN
 from scipy.optimize import linear_sum_assignment
-from typing import Callable, Optional, Tuple, Union, List, Dict
-from iznn.dynamic_attractors import resample_data, dynamic_attractors_pipeline
+from typing import Callable, Optional, Tuple, Union, List, Dict, Iterable, Collection
+from ctneat.iznn.dynamic_attractors import resample_data, dynamic_attractors_pipeline
 
 class Discretizer:
     """
     This class is used to discretize continuous network dynamics.
     """
 
-    def __init__(self, network, inputs: List[Union[Tuple, List]], outputs: List[Union[int, float]],
+    def __init__(self, network, inputs: Collection[Collection], outputs: Collection[Union[Collection, int, float]],
                  max_time: float = 20.0, dt: float = 0.05,
-                 force_cluster_num: bool = False, epsilon: float = 0.5, min_samples: int = 5,
-                 random_state: Optional[int] = None, verbose: bool = False, printouts: bool = True,
+                 force_cluster_num: bool = False, epsilon: float = 0.5, min_samples: int = 1,
+                 random_state: Optional[int] = 3, verbose: bool = False, printouts: bool = True,
                  advance_args: Optional[Dict] = None, dynamics_args: Optional[Dict] = None):
         """
         Initializes the Discretizer with the given parameters.
@@ -59,12 +59,12 @@ class Discretizer:
         self.unique_outputs = list(set(self.outputs))
         self.num_unique_outputs = len(self.unique_outputs)
         # force an order on the unique outputs
-        self.unique_outputs.sort()
+        self.unique_outputs.sort(key=lambda x: (isinstance(x, str), x))
         if self.verbose:
             print(f"Unique outputs identified: {self.unique_outputs}")
 
         # placeholder for network attractors produced by each input
-        self.network_attractors = [None] * len(self.inputs)
+        self.network_attractors = {}
 
     def run_network(self):
         """
@@ -78,8 +78,8 @@ class Discretizer:
             self.network.set_inputs(input_vector)
             
             times = [self.network.time_ms]
-            voltage_history = [self.network.get_voltages()]
-            fired_history = [self.network.get_fired()]
+            voltage_history = [self.network.voltages]
+            fired_history = [self.network.fired]
             while self.network.time_ms < self.max_time:
                 voltages, fired = self.network.advance(dt=min(self.dt, max(self.max_time - self.network.time_ms, 0.0001)), ret=['voltages', 'fired'], **self.advance_args)
                 times.append(self.network.time_ms)
@@ -98,8 +98,94 @@ class Discretizer:
             
             # analyze dynamics to find attractor state
             attractor_state = dynamic_attractors_pipeline(voltage_history=uniform_voltage_history, fired_history=uniform_fired_history, times_np=uniform_time_steps,
-                                                         variable_burn_in=True, verbose=self.verbose, printouts=self.printouts, **self.dynamics_args)
-            
-
+                                                         variable_burn_in=True, fingerprint_vec=True, verbose=self.verbose, printouts=self.printouts, **self.dynamics_args)
+            self.network_attractors[i] = attractor_state
+            if self.verbose:
+                print(f"Attractor state for input {i+1}: {attractor_state}")
         if self.printouts:
             print("Network run complete. Attractor states recorded.")
+
+    def cluster_attractors(self) -> Dict[int, int]:
+        """
+        Cluster the attractor states using either KMeans or DBSCAN.
+        If force_cluster_num is True, KMeans is used with number of clusters equal to number of unique outputs.
+        Otherwise, DBSCAN is used.
+
+        Returns:
+            A dictionary mapping input index to cluster label.
+        """
+        # select only the attractor states which were found (not None)
+        attractor_states = [np.array(self.network_attractors[i]) for i in range(len(self.inputs)) if self.network_attractors[i] is not None]
+        attractor_states = np.array(attractor_states)
+
+        if len(attractor_states) == 0:
+            return {}
+        if self.force_cluster_num:
+            if self.verbose:
+                print("Clustering attractors using KMeans...")
+            kmeans = KMeans(n_clusters=self.num_unique_outputs, random_state=self.random_state)
+            cluster_labels = kmeans.fit_predict(attractor_states)
+        else:
+            if self.verbose:
+                print("Clustering attractors using DBSCAN...")
+            dbscan = DBSCAN(eps=self.epsilon, min_samples=self.min_samples)
+            cluster_labels = dbscan.fit_predict(attractor_states)
+        
+        if self.verbose:
+            print(f"Cluster labels assigned: {cluster_labels}")
+
+        # map input index to cluster label
+        input_to_cluster = {i: cluster_labels[i] for i in range(len(self.inputs))}
+        return input_to_cluster
+
+    def map_clusters_to_outputs(self, input_to_cluster: Dict[int, int]) -> Dict[int, Union[int, float]]:
+        """
+        Map the clusters to the expected outputs using the Hungarian algorithm to minimize total mismatch.
+
+        Args:
+            input_to_cluster (Dict[int, int]): A dictionary mapping input index to cluster label.
+
+        Returns:
+            A dictionary mapping cluster label to expected output value.
+        """
+        if len(input_to_cluster) == 0:
+            return {}
+
+        # create cost matrix
+        cost_matrix = np.zeros((self.num_unique_outputs, self.num_unique_outputs))
+        for i in range(len(self.inputs)):
+            if i in input_to_cluster:
+                cluster_label = input_to_cluster[i]
+                if cluster_label != -1:  # ignore noise points from DBSCAN
+                    output_value = self.outputs[i]
+                    output_index = self.unique_outputs.index(output_value)
+                    cost_matrix[cluster_label, output_index] += 1
+
+        # convert counts to costs
+        cost_matrix = np.max(cost_matrix) - cost_matrix
+
+        # apply Hungarian algorithm
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+        # create mapping from cluster label to output value
+        cluster_to_output = {row: self.unique_outputs[col] for row, col in zip(row_ind, col_ind)}
+        
+        if self.verbose:
+            print(f"Cluster to output mapping: {cluster_to_output}")
+
+        return cluster_to_output
+    
+    def discretize(self) -> Dict[int, Union[int, float, None]]:
+        """
+        Run the full discretization pipeline: run the network, cluster attractors, and map clusters to outputs.
+
+        Returns:
+            A dictionary mapping input index to predicted output value.
+        """
+        self.run_network()
+        input_to_cluster = self.cluster_attractors()
+        cluster_to_output = self.map_clusters_to_outputs(input_to_cluster)
+        input_to_output = {i: cluster_to_output.get(input_to_cluster.get(i, -1), None) for i in range(len(self.inputs))}
+        if self.printouts:
+            print("Discretization complete.")
+        return input_to_output
