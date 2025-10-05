@@ -75,7 +75,7 @@ def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Opti
         # Run the simulation to get the data at uniform time steps
         net.reset()
         for idx in range(uniform_data.shape[0]):
-            state = net.advance(dt_msec=dt_uniform_ms, events=events, ret=ret)
+            state = net.advance(dt=dt_uniform_ms, events=events, ret=ret)
             uniform_data[idx, :] = state
     else:
         # Interpolate each neuron's data onto the new grid
@@ -395,7 +395,7 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
             if printouts:
                 print("No significant periods found for any neuron. This is likely a point attractor.")
             if fingerprint_using == 'firing':
-                return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
+                return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0], return_vec=fingerprint_vec)
             else: # fingerprint_using == 'voltage'
                 return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence, return_vec=fingerprint_vec)
         # Compute the LCM of the individual periods
@@ -425,9 +425,9 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
             if printouts:
                 print("Signal has very low variation. This is probably a point attractor.")
             if fingerprint_using == 'firing':
-                return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
+                return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0], return_vec=fingerprint_vec)
             else: # fingerprint_using == 'voltage'
-                return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence)
+                return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence, return_vec=fingerprint_vec)
 
         # If there is variation, proceed with FFT
         # Compute the frequency spectrum and find the dominant frequency
@@ -448,7 +448,7 @@ def fingerprint_attractors(voltage_history: np.ndarray, fired_history: np.ndarra
             if printouts:
                 print("No dominant frequency found. This is likely a point attractor.")
             if fingerprint_using == 'firing':
-                return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0])
+                return characterize_attractor_spikes(fired_history, fired_history.shape[0]-1, fired_history.shape[0], return_vec=fingerprint_vec)
             else: # fingerprint_using == 'voltage'
                 return characterize_attractor_voltage(voltage_history, dt, num_peaks=num_peaks, min_peak_prominence=min_peak_prominence, return_vec=fingerprint_vec)
 

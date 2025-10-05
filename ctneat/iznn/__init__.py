@@ -348,7 +348,7 @@ class IZNN(object):
         """
         return 0.05
 
-    def advance(self, dt_msec: float, method: Optional[str] = 'LSODA', events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
+    def advance(self, dt: float, method: Optional[str] = 'LSODA', events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """
         Advances the simulation by the given time step in milliseconds.
 
@@ -386,9 +386,9 @@ class IZNN(object):
             ValueError: If an invalid integration method is specified.
         """
         if self.event_driven:
-            return self.advance_event_driven(dt_msec, method=method or 'LSODA', ret=ret)
+            return self.advance_event_driven(dt, method=method or 'LSODA', ret=ret)
         else:
-            return self.advance_simple(dt_msec, method=method, events=events, ret=ret)
+            return self.advance_simple(dt, method=method, events=events, ret=ret)
 
     def advance_simple(self, dt_msec, method: Optional[str] = 'LSODA', events: bool = False, ret: Optional[Union[List[str], str]] = None) -> Union[List[float], List[List[float]]]:
         """

@@ -14,7 +14,7 @@ xor_inputs = ((0, 0), (0, 1), (1, 0), (1, 1))
 xor_outputs = (0, 1, 1, 0)
 
 # Maximum amount of simulated time (in milliseconds) to wait for the network to produce an output.
-max_time_msec = 20.0
+max_time_msec = 100.0
 
 if __name__ == "__main__":
     # Create a simple IZNN network for the XOR problem.
@@ -34,10 +34,10 @@ if __name__ == "__main__":
                               force_cluster_num=True, epsilon=0.5, min_samples=1,
                               random_state=3, verbose=True, printouts=True)
 
-    # # Run the discretization process.
-    # states, state_outputs = discretizer.run()
+    # Run the discretization process.
+    inputs_to_outputs = discretizer.discretize()
 
-    # # Print the results.
-    # print("Discretized States:")
-    # for i, state in enumerate(states):
-    #     print(f"State {i}: {state}, Output: {state_outputs[i]}")
+    # Print the results.
+    print("Discretized States:")
+    for i, state in enumerate(inputs_to_outputs):
+        print(f"State {i}: {xor_inputs[state]}, Output: {inputs_to_outputs[i]}")

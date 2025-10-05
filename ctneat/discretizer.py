@@ -70,6 +70,7 @@ class Discretizer:
         """
         Run the network for each input and the specified max_time.
         Network dynamics is measured and used to find the attractor state which is stored in self.network_attractors.
+        If an attractor state cannot be found, None is stored for that input.
         """
         for i, input_vector in enumerate(self.inputs):
             if self.verbose:
