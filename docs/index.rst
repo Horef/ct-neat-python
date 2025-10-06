@@ -39,7 +39,8 @@ Contents:
    customization
    activation
    ctrnn
-   disretizer
+   dynamic_attractors
+   discretizer
    genome-interface
    reproduction-interface
    docstrings
