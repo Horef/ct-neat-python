@@ -39,6 +39,7 @@ Contents:
    customization
    activation
    ctrnn
+   disretizer
    genome-interface
    reproduction-interface
    docstrings
