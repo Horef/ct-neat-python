@@ -28,20 +28,20 @@ network's (CTRNN) dynamics into a discrete output.
 The discretizer class works as follows:
 
 1. When initialized, it takes any CTRNN network, a set of input values on which the network will be evaluated,
-a set of expected output values corresponding to the inputs, and parameters controlling the discretization process
-and any other controllable part of the network's dynamics (e.g., simulation time, time step, etc.).
+   a set of expected output values corresponding to the inputs, and parameters controlling the discretization process
+   and any other controllable part of the network's dynamics (e.g., simulation time, time step, etc.).
 2. For each input value, the network is simulated over a specified period of time, and its dynamics are recorded.
 3. The recorded dynamics are then analyzed to identify stable attractors or patterns in the network's behavior. This
-step uses the functions defined in the :py:mod:`iznn.dynamic_attractors` module, which returns a vector encoding 
-the attractor (if one is found).
+   step uses the functions defined in the :py:mod:`iznn.dynamic_attractors` module, which returns a vector encoding 
+   the attractor (if one is found).
 4. Over the space of the identified attractors, a clustering algorithm is applied to group similar attractors together.
-Either fixed number of clusters can be specified, or the algorithm can determine the optimal number of clusters
-based on the data.
+   Either fixed number of clusters can be specified, or the algorithm can determine the optimal number of clusters
+   based on the data.
 5. Once each input has been associated with a cluster, the Hungarian (or Munkres) algorithm is used to optimally match 
-the identified clusters with the expected output values, minimizing the overall discrepancy between the network's 
-outputs and the expected outputs.
+   the identified clusters with the expected output values, minimizing the overall discrepancy between the network's 
+   outputs and the expected outputs.
 6. The final output of the discretizer is a mapping from each input to its corresponding discrete output, based on the
-identified attractors and the optimal matching process.
+   identified attractors and the optimal matching process.
 
 Here are the docstrings for the module:
 
