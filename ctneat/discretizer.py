@@ -17,7 +17,9 @@ class Discretizer:
                  max_time: float = 20.0, dt: float = 0.05,
                  force_cluster_num: bool = False, epsilon: float = 0.5, min_samples: int = 1,
                  random_state: Optional[int] = 3, verbose: bool = False, printouts: bool = True,
-                 advance_args: Optional[Dict] = None, dynamics_args: Optional[Dict] = None):
+                 advance_args: Optional[Dict] = None, resample_data_args: Optional[Dict] = None, 
+                 dynamics_args: Optional[Dict] = None, kmeans_args: Optional[Dict] = None,
+                 dbscan_args: Optional[Dict] = None):
         """
         Initializes the Discretizer with the given parameters.
 
@@ -38,7 +40,15 @@ class Discretizer:
             verbose (bool): If True, prints detailed logs during processing.
             printouts (bool): If True, prints summary information after processing.
             advance_args (Optional[Dict]): Additional arguments for the network's advance method.
+                For reference, see the `advance` method of the network being used.
+            resample_data_args (Optional[Dict]): Additional arguments for the resample_data function.
+                For reference, see the `resample_data` function in ctneat.iznn.dynamic_attractors.
             dynamics_args (Optional[Dict]): Additional arguments for the network's dynamics method.
+                For reference, see the `dynamic_attractors_pipeline` function in ctneat.iznn.dynamic_attractors.
+            kmeans_args (Optional[Dict]): Additional arguments for KMeans clustering.
+                For reference, see sklearn.cluster.KMeans.
+            dbscan_args (Optional[Dict]): Additional arguments for DBSCAN clustering.
+                For reference, see sklearn.cluster.DBSCAN.
         """
 
         self.network = network
@@ -52,8 +62,33 @@ class Discretizer:
         self.random_state = random_state
         self.verbose = verbose
         self.printouts = printouts
+        # processing the advance_args dictionary as some arguments are passed directly to the functions
         self.advance_args = advance_args if advance_args is not None else {}
+        self._advance_args_ret = self.advance_args.get('ret', ['voltages', 'fired'])
+        if 'ret' in self.advance_args:
+            del self.advance_args['ret']
+        # similarly for resample_data_args
+        self.resample_data_args = resample_data_args if resample_data_args is not None else {}
+        self._dt_uniform_ms = self.resample_data_args.get('dt_uniform_ms', 'min')
+        if 'dt_uniform_ms' in self.resample_data_args:
+            del self.resample_data_args['dt_uniform_ms']
+        
+        self._using_simulation = self.resample_data_args.get('using_simulation', True)
+        if 'using_simulation' in self.resample_data_args:
+            del self.resample_data_args['using_simulation']
+        
+        self._events = self.resample_data_args.get('events', False)
+        if 'events' in self.resample_data_args:
+            del self.resample_data_args['events']
+        # similarly for dynamics_args
         self.dynamics_args = dynamics_args if dynamics_args is not None else {}
+        self._variable_burn_in = self.dynamics_args.get('variable_burn_in', True)
+        if 'variable_burn_in' in self.dynamics_args:
+            del self.dynamics_args['variable_burn_in']
+        # similarly for kmeans_args
+        self.kmeans_args = kmeans_args if kmeans_args is not None else {}
+        # similarly for dbscan_args
+        self.dbscan_args = dbscan_args if dbscan_args is not None else {}
 
         # calculate number of unique outputs
         self.unique_outputs = list(set(self.outputs))
@@ -82,7 +117,8 @@ class Discretizer:
             voltage_history = [self.network.voltages]
             fired_history = [self.network.fired]
             while self.network.time_ms < self.max_time:
-                voltages, fired = self.network.advance(dt=min(self.dt, max(self.max_time - self.network.time_ms, 0.0001)), ret=['voltages', 'fired'], **self.advance_args)
+                voltages, fired = self.network.advance(dt=min(self.dt, max(self.max_time - self.network.time_ms, 0.0001)), 
+                                                       ret=self._advance_args_ret, **self.advance_args)
                 times.append(self.network.time_ms)
                 voltage_history.append(voltages)
                 fired_history.append(fired)
@@ -92,16 +128,18 @@ class Discretizer:
             fired_history = np.array(fired_history)
 
             # resample to uniform time steps
-            uniform_time_steps, uniform_voltage_history = resample_data(times, voltage_history, dt_uniform_ms='min', 
-                                                                        using_simulation=True, net=self.network, events=False, ret='voltages')
-            _, uniform_fired_history = resample_data(times, fired_history, dt_uniform_ms='min', 
-                                                    using_simulation=True, net=self.network, events=False, ret='fired')
-            
+            uniform_time_steps, uniform_voltage_history = resample_data(times, voltage_history, dt_uniform_ms=self._dt_uniform_ms, 
+                                                                        using_simulation=self._using_simulation, net=self.network, 
+                                                                        events=self._events, ret='voltages')
+            _, uniform_fired_history = resample_data(times, fired_history, dt_uniform_ms=self._dt_uniform_ms, 
+                                                    using_simulation=self._using_simulation, net=self.network, 
+                                                    events=self._events, ret='fired')
+
             # analyze dynamics to find attractor state
             attractor_state = dynamic_attractors_pipeline(voltage_history=uniform_voltage_history, fired_history=uniform_fired_history, times_np=uniform_time_steps,
-                                                         variable_burn_in=True, fingerprint_vec=True, verbose=self.verbose, printouts=self.printouts, **self.dynamics_args)
+                                                         variable_burn_in=self._variable_burn_in, fingerprint_vec=True, verbose=self.verbose, printouts=self.printouts, **self.dynamics_args)
             self.network_attractors[i] = attractor_state
-            if self.verbose:
+            if self.printouts:
                 print(f"Attractor state for input {i+1}: {attractor_state}")
         if self.printouts:
             print("Network run complete. Attractor states recorded.")
@@ -124,15 +162,16 @@ class Discretizer:
         if self.force_cluster_num:
             if self.verbose:
                 print("Clustering attractors using KMeans...")
-            kmeans = KMeans(n_clusters=self.num_unique_outputs, random_state=self.random_state)
+            kmeans = KMeans(n_clusters=self.num_unique_outputs, random_state=self.random_state, verbose=int(self.verbose),
+                            **self.kmeans_args)
             cluster_labels = kmeans.fit_predict(attractor_states)
         else:
             if self.verbose:
                 print("Clustering attractors using DBSCAN...")
-            dbscan = DBSCAN(eps=self.epsilon, min_samples=self.min_samples)
+            dbscan = DBSCAN(eps=self.epsilon, min_samples=self.min_samples, **self.dbscan_args)
             cluster_labels = dbscan.fit_predict(attractor_states)
         
-        if self.verbose:
+        if self.printouts:
             print(f"Cluster labels assigned: {cluster_labels}")
 
         # map input index to cluster label
