@@ -165,7 +165,7 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
     return result
 
 
-def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end: int, return_vec: bool = False) -> Union[str, List[int]]:
+def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end: int, return_vec: bool = False) -> Union[str, List[float]]:
     """
     Creates a spike pattern string for a detected attractor period.
     

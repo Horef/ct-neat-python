@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ct-neat-python"
-version = "1.0.1"
+version = "1.1.0"
 description = "A CT (Continuous Time) NEAT (NeuroEvolution of Augmenting Topologies) implementation"
 readme = "README.md"
 requires-python = ">=3.8"

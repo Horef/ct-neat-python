@@ -77,9 +77,9 @@ release = u'28.09.2025'
 # built documents.
 #
 # The short X.Y.Z version.
-version = '1.0.1'
+version = '1.1.0'
 # The full version, including alpha/beta/rc tags.
-release = '1.0.1'
+release = '1.1.0'
 
 if version != release:
     tags.add('draft')
