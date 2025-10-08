@@ -4,6 +4,7 @@ import graphviz
 import matplotlib.pyplot as plt
 import numpy as np
 
+save_dir = 'ctneat_outputs'
 
 def plot_stats(statistics, ylog=False, view=False, filename='avg_fitness.svg'):
     """ Plots the population's average and best fitness. """
@@ -29,7 +30,7 @@ def plot_stats(statistics, ylog=False, view=False, filename='avg_fitness.svg'):
     if ylog:
         plt.gca().set_yscale('symlog')
 
-    plt.savefig(filename)
+    plt.savefig(save_dir + '/' + filename)
     if view:
         plt.show()
 
@@ -75,7 +76,7 @@ def plot_spikes(spikes, view=False, filename=None, title=None):
     plt.plot(t_values, I_values, "r-o")
 
     if filename is not None:
-        plt.savefig(filename)
+        plt.savefig(save_dir + '/' + filename)
 
     if view:
         plt.show()
@@ -102,7 +103,7 @@ def plot_species(statistics, view=False, filename='speciation.svg'):
     plt.ylabel("Size per Species")
     plt.xlabel("Generations")
 
-    plt.savefig(filename)
+    plt.savefig(save_dir + '/' + filename)
 
     if view:
         plt.show()
@@ -110,7 +111,7 @@ def plot_species(statistics, view=False, filename='speciation.svg'):
     plt.close()
 
 
-def draw_net(config, genome, view=False, filename=None, node_names=None, show_disabled=True, prune_unused=False,
+def draw_net(config, genome, view=False, filename='network', node_names=None, show_disabled=True, prune_unused=False,
              node_colors=None, fmt='svg'):
     """ Receives a genome and draws a neural network with arbitrary topology. """
     # Attributes for network nodes.
@@ -176,6 +177,6 @@ def draw_net(config, genome, view=False, filename=None, node_names=None, show_di
             width = str(0.1 + abs(cg.weight / 5.0))
             dot.edge(a, b, _attributes={'style': style, 'color': color, 'penwidth': width})
 
-    dot.render(filename, view=view)
+    dot.render(save_dir + '/' + filename, view=view)
 
     return dot

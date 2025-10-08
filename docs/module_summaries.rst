@@ -59,6 +59,14 @@ Has the built-in :term:`activation functions <activation function>`, code for us
       :return: Whether or not the function is known.
       :rtype: :pytypes:`bool <typesnumeric>`
 
+Here are the docstrings for the module:
+
+.. automodule:: ctneat.activations
+   :members:
+   :undoc-members:
+   :special-members: __init__
+
+
 .. index:: ! aggregation function
 
 .. py:module:: aggregations
@@ -217,6 +225,14 @@ Has the built-in :term:`aggregation functions <aggregation function>`, code for 
 
   .. versionchanged:: 0.92
     Moved from :py:mod:`genome` and expanded to match `activations` (plus the ``maxabs``, ``median``, and ``mean`` functions added).
+
+Here are the docstrings for the module:
+
+.. automodule:: ctneat.aggregations
+   :members:
+   :undoc-members:
+   :special-members: __init__
+
 
 .. py:module:: attributes
    :synopsis: Deals with attributes used by genes.

@@ -43,6 +43,7 @@ Contents:
    discretizer
    genome-interface
    reproduction-interface
+   module_summaries
    docstrings
    glossary
 

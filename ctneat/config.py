@@ -1,4 +1,6 @@
-"""Does general configuration parsing; used by other classes for their configuration."""
+"""
+Does general configuration parsing; used by other classes for their configuration.
+"""
 
 import os
 import warnings
@@ -6,19 +8,50 @@ from configparser import ConfigParser
 
 
 class ConfigParameter(object):
-    """Contains information about one configuration item."""
+    """
+    Contains information about one configuration item.
+    """
 
     def __init__(self, name, value_type, default=None):
+        """
+        Initializes a configuration parameter.
+
+        Args:
+            name: The name of the configuration parameter.
+            value_type: The expected type of the configuration parameter (e.g., int, float, bool, str, list).
+            default: The default value for the configuration parameter if not specified.
+        """
         self.name = name
         self.value_type = value_type
         self.default = default
 
     def __repr__(self):
+        """
+        Returns a string representation of the ConfigParameter instance.
+
+        Returns:
+            A string that includes the name, value type, and default value (if any) of the configuration parameter.
+            Example: "ConfigParameter('pop_size', <class 'int'>, 150)"
+        """
         if self.default is None:
             return f"ConfigParameter({self.name!r}, {self.value_type!r})"
         return f"ConfigParameter({self.name!r}, {self.value_type!r}, {self.default!r})"
 
     def parse(self, section, config_parser):
+        """
+        Parses the configuration parameter from the given section of the config_parser.
+
+        Args:
+            section: The section in the configuration file where the parameter is located.
+            config_parser: An instance of ConfigParser that contains the configuration data.
+
+        Returns:
+            The value of the configuration parameter, converted to the appropriate type.
+
+        Raises:
+            RuntimeError: If the value type is unexpected or if there is an error in parsing.
+        """
+
         if int == self.value_type:
             return config_parser.getint(section, self.name)
         if bool == self.value_type:
@@ -26,6 +59,7 @@ class ConfigParameter(object):
         if float == self.value_type:
             return config_parser.getfloat(section, self.name)
         if list == self.value_type:
+            """Lists are stored as space-separated strings."""
             v = config_parser.get(section, self.name)
             return v.split(" ")
         if str == self.value_type:
@@ -35,8 +69,17 @@ class ConfigParameter(object):
 
     def interpret(self, config_dict):
         """
-        Converts the config_parser output into the proper type,
+        Converts the config_parser output (which is in a dictionary) into the proper type,
         supplies defaults if available and needed, and checks for some errors.
+
+        Args:
+            config_dict: A dictionary containing configuration parameters.
+
+        Returns:
+            The value of the configuration parameter, converted to the appropriate type.
+        
+        Raises:
+            RuntimeError: If the value type is unexpected or if there is an error in interpreting.
         """
         value = config_dict.get(self.name)
         if value is None:
@@ -72,12 +115,30 @@ class ConfigParameter(object):
         raise RuntimeError("Unexpected configuration type: " + repr(self.value_type))
 
     def format(self, value):
+        """
+        Formats the configuration parameter value as a string for saving to a file.
+        
+        Args:
+            value: The value of the configuration parameter to format.
+        
+        Returns:
+            A string representation of the configuration parameter value.
+        """
         if list == self.value_type:
             return " ".join(value)
         return str(value)
 
 
 def write_pretty_params(f, config, params):
+    """
+    Writes out configuration parameters in a human-readable format.
+
+    Args:
+        f: A file-like object to write the parameters to.
+        config: An object containing the configuration parameters as attributes.
+        params: A list of ConfigParameter instances representing the parameters to write.
+    """
+
     param_names = [p.name for p in params]
     longest_name = max(len(name) for name in param_names)
     param_names.sort()
@@ -100,6 +161,17 @@ class DefaultClassConfig(object):
     """
 
     def __init__(self, param_dict, param_list):
+        """
+        Initializes the DefaultClassConfig with the given parameter dictionary and list.
+
+        Args:
+            param_dict: A dictionary containing configuration parameters.
+            param_list: A list of ConfigParameter instances representing the parameters to parse.
+        
+        Raises:
+            UnknownConfigItemError: If there are unknown configuration items in param_dict.
+        """
+
         self._params = param_list
         param_list_names = []
         for p in param_list:
@@ -121,6 +193,7 @@ class DefaultClassConfig(object):
 class Config(object):
     """A container for user-configurable parameters of NEAT."""
 
+    # The configuration parameters.
     __params = [ConfigParameter('pop_size', int),
                 ConfigParameter('fitness_criterion', str),
                 ConfigParameter('fitness_threshold', float),
@@ -128,6 +201,29 @@ class Config(object):
                 ConfigParameter('no_fitness_termination', bool, False)]
 
     def __init__(self, genome_type, reproduction_type, species_set_type, stagnation_type, filename, config_information=None):
+        """
+        Creates a new configuration object using the given genome, reproduction,
+        species set, and stagnation classes.  These classes must have a static
+        method called `parse_config` that takes a dictionary of string key/value
+        pairs and returns a configuration object appropriate to the class.  The
+        configuration object is then stored in the `genome_config`,
+        `reproduction_config`, `species_set_config`, and `stagnation_config`
+        attributes.
+
+        Args:
+            genome_type: The genome class to use.
+            reproduction_type: The reproduction class to use.
+            species_set_type: The species set class to use.
+            stagnation_type: The stagnation class to use.
+            filename: The name of the configuration file to load.
+            config_information: Optional string containing additional configuration information.
+
+        Raises:
+            Exception: If the configuration file does not exist.
+            RuntimeError: If required sections or parameters are missing in the configuration file.
+            UnknownConfigItemError: If there are unknown configuration items in the file.
+        """
+
         # Check that the provided types have the required methods.
         assert hasattr(genome_type, 'parse_config')
         assert hasattr(reproduction_type, 'parse_config')
@@ -184,6 +280,13 @@ class Config(object):
         self.reproduction_config = reproduction_type.parse_config(reproduction_dict)
 
     def save(self, filename):
+        """
+        Saves the current configuration to a file.
+
+        Args:
+            filename: The name of the file to save the configuration to.
+        """
+
         with open(filename, 'w') as f:
             f.write('# The `NEAT` section specifies parameters particular to the NEAT algorithm\n')
             f.write('# or the experiment itself.  This is the only required section.\n')

@@ -16,7 +16,8 @@ class Discretizer:
     def __init__(self, network, inputs: Collection[Collection], outputs: Collection[Union[Collection, int, float]],
                  max_time: float = 20.0, dt: float = 0.05,
                  force_cluster_num: bool = False, epsilon: float = 0.5, min_samples: int = 1,
-                 random_state: Optional[int] = 3, verbose: bool = False, printouts: bool = True,
+                 random_state: Optional[int] = 3, ret_initial_det: bool = False,
+                 verbose: bool = False, printouts: bool = True,
                  advance_args: Optional[Dict] = None, resample_data_args: Optional[Dict] = None, 
                  dynamics_args: Optional[Dict] = None, kmeans_args: Optional[Dict] = None,
                  dbscan_args: Optional[Dict] = None):
@@ -37,6 +38,8 @@ class Discretizer:
             min_samples (int): Minimum samples parameter for DBSCAN clustering. This is the number of samples 
                 in a neighborhood for a point to be considered as a core point.
             random_state (Optional[int]): Random state for reproducibility. If None, randomness is not controlled.
+            ret_initial_det (bool): If True, and in case of failure to find an attractor, returns the initial determinism value
+                instead of None.
             verbose (bool): If True, prints detailed logs during processing.
             printouts (bool): If True, prints summary information after processing.
             advance_args (Optional[Dict]): Additional arguments for the network's advance method.
@@ -60,6 +63,7 @@ class Discretizer:
         self.epsilon = epsilon
         self.min_samples = min_samples
         self.random_state = random_state
+        self.ret_initial_det = ret_initial_det
         self.verbose = verbose
         self.printouts = printouts
         # processing the advance_args dictionary as some arguments are passed directly to the functions
@@ -98,6 +102,8 @@ class Discretizer:
         if self.verbose:
             print(f"Unique outputs identified: {self.unique_outputs}")
 
+        # placeholder for determinism values for each input (where attractor was not found)
+        self.input_determinisms = {}
         # placeholder for network attractors produced by each input
         self.network_attractors = {}
 
@@ -137,7 +143,11 @@ class Discretizer:
 
             # analyze dynamics to find attractor state
             attractor_state = dynamic_attractors_pipeline(voltage_history=uniform_voltage_history, fired_history=uniform_fired_history, times_np=uniform_time_steps,
-                                                         variable_burn_in=self._variable_burn_in, fingerprint_vec=True, verbose=self.verbose, printouts=self.printouts, **self.dynamics_args)
+                                                         variable_burn_in=self._variable_burn_in, fingerprint_vec=True, ret_initial_det=self.ret_initial_det, 
+                                                         verbose=self.verbose, printouts=self.printouts, **self.dynamics_args)
+            if isinstance(attractor_state, float):
+                self.input_determinisms[i] = attractor_state
+                attractor_state = None
             self.network_attractors[i] = attractor_state
             if self.printouts:
                 print(f"Attractor state for input {i+1}: {attractor_state}")
@@ -214,8 +224,8 @@ class Discretizer:
             print(f"Cluster to output mapping: {cluster_to_output}")
 
         return cluster_to_output
-    
-    def discretize(self) -> Dict[int, Union[int, float, None]]:
+
+    def discretize(self) -> Union[Dict[int, Union[int, float, None]], Tuple[Dict[int, Union[int, float, None]], Dict[int, float]]]:
         """
         Run the full discretization pipeline: run the network, cluster attractors, and map clusters to outputs.
 
@@ -228,4 +238,6 @@ class Discretizer:
         input_to_output = {i: cluster_to_output.get(input_to_cluster.get(i, -1), None) for i in range(len(self.inputs))}
         if self.printouts:
             print("Discretization complete.")
+        if self.ret_initial_det:
+            return input_to_output, self.input_determinisms
         return input_to_output

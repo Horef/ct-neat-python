@@ -37,6 +37,10 @@ The discretizer class works as follows:
    step uses the functions defined in the :py:mod:`iznn.dynamic_attractors` module, which returns a vector encoding 
    the attractor (if one is found).
 
+   * If no attractor is found for a given input, then, based on the :py:param:`ret_initial_det` parameter, either None is 
+     stored as the attractor state for that input, or the determinism value for the dynamics of the system after the initial burn-in 
+     (a float between 0 and 1) is stored instead.
+
 4. Over the space of the identified attractors, a clustering algorithm is applied to group similar attractors together.
    Either fixed number of clusters can be specified, or the algorithm can determine the optimal number of clusters
    based on the data.
@@ -46,7 +50,8 @@ The discretizer class works as follows:
    outputs and the expected outputs.
 
 6. The final output of the discretizer is a mapping from each input to its corresponding discrete output, based on the
-   identified attractors and the optimal matching process.
+   identified attractors and the optimal matching process. Additionally, if the :py:param:`ret_initial_det` parameter is set to True,
+   a mapping from each input to the determinism value (for inputs where no attractor was found) is also returned.
 
 Here are the docstrings for the module:
 

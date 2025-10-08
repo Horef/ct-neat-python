@@ -487,7 +487,8 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
                                 superimpose: bool = False, use_lcm: bool = True,
                                 flat_signal_threshold: float = 1e-3,
                                 num_peaks: int = 3, min_peak_prominence: float = 0.1,
-                                printouts: bool = True, verbose: bool = False) -> Optional[Union[str, List[float]]]:
+                                ret_initial_det: bool = False,
+                                printouts: bool = True, verbose: bool = False) -> Optional[Union[float, str, List[float]]]:
     """
     Full pipeline to analyze dynamic attractors in IZNN data.
     This includes resampling to uniform time steps, performing RQA, and characterizing attractors.
@@ -538,6 +539,8 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
         num_peaks (int): The maximum number of frequency peaks to include for each neuron when using voltage fingerprinting.
         min_peak_prominence (float): The minimum prominence for a peak in the frequency spectrum to be 
             considered when using voltage fingerprinting. This helps filter out noise.
+        ret_initial_det (bool): If True, and in case of not finding an attractor, returns the initial determinism value instead of None.
+            Where initial determinism is the DET value obtained from RQA using the burn-in provided in the burn_in argument.
         printouts (bool): If True, prints summary information about the analysis.
         verbose (bool): If True, prints detailed information during the analysis. (If set to true, also enables printouts.)
     
@@ -591,6 +594,8 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
             print(f"Not enough data points after burn-in ({uniform_times.shape[0] - burn_in} < {min_points}). Cannot perform analysis.")
         return None
 
+    initial_det = None
+
     # While the amount of data left after burn-in is sufficient
     while (uniform_times.shape[0] - burn_in) >= max(min_repetitions * 2, min_points):
         if variable_burn_in:
@@ -599,6 +604,8 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
         # Perform RQA analysis on the voltage data to detect determinism
         rqa_result = perform_rqa_analysis(uniform_voltage_history, burn_in=burn_in, time_delay=time_delay, radius=radius,
                                         theiler_corrector=theiler_corrector, metric=metric, printouts=printouts, verbose=verbose)
+        if initial_det is None:
+            initial_det = float(rqa_result.determinism)
         # If the determinism is above the threshold, it is likely there is an attractor, so we try to characterize it
         if rqa_result.determinism > det_threshold:
             # Fingerprint the attractor using the chosen method
@@ -622,12 +629,16 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
                 print(f"Determinism below threshold (DET={rqa_result.determinism:.3f} < {det_threshold}). Skipping attractor characterization.")
         
         if not variable_burn_in:
+            if ret_initial_det:
+                return initial_det
             return None
         else:
             # if the burn-in is at its maximum (all but min_points), stop
             if (uniform_times.shape[0] - burn_in) <= min_points:
                 if printouts:
                     print("Reached maximum burn-in. Not enough data left to continue analysis.")
+                if ret_initial_det:
+                    return initial_det
                 return None
             # increase the burn-in period and try again
             new_burn_in = burn_in + int(burn_in_rate * (uniform_times.shape[0] - burn_in))
