@@ -69,7 +69,7 @@ def run(config_path):
                          config_path)
 
     # For this network, we use one output neuron and use its dynamics to determine the output value.
-    config.num_outputs = 1
+    config.output_nodes = 1
 
     pop = ctneat.population.Population(config)
 

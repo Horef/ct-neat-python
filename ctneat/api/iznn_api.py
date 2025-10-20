@@ -54,7 +54,7 @@ def create_iznn_network(node_params: Union[Dict[int, Dict[str, Any]], Dict[str, 
 
     return net
 
-def simulate_iznn_network(net: IZNN, time_steps: int, dt_ms: float,
+def simulate_iznn_network(net: IZNN, time_steps: int, steps_ms: bool = False, dt_ms: float = 0.05,
                           ret: Union[str, List[str]] = 'voltages',
                           uniform: bool = True) -> List[np.ndarray]:
     """
@@ -63,6 +63,8 @@ def simulate_iznn_network(net: IZNN, time_steps: int, dt_ms: float,
     Args:
         net: An instance of the IZNN class representing the network to be simulated.
         time_steps: The number of time steps to simulate.
+        steps_ms: If True, the time_steps parameter is interpreted as milliseconds. 
+            If False, it is interpreted as number of discrete steps.
         dt_ms: The size of each time step in milliseconds.
         ret (list(str) or str): Specifies what to return.
                 If a list of strings, returns a list of lists, where each inner list corresponds to
@@ -88,8 +90,15 @@ def simulate_iznn_network(net: IZNN, time_steps: int, dt_ms: float,
     fired_history = [[net.neurons[nid].fired for nid in net.outputs]]
     recovery_history = [[net.neurons[nid].u for nid in net.outputs]]
 
-    for _ in range(time_steps):
-        voltages, fired, recovery = net.advance_event_driven(dt_ms, ret=['voltages', 'fired', 'recovery'])
+    while True:
+        if steps_ms:
+            if times[-1] >= time_steps:
+                break
+        else:
+            if len(times) >= time_steps:
+                break
+        c_dt = min(dt_ms, time_steps - times[-1]) if steps_ms else dt_ms
+        voltages, fired, recovery = net.advance_event_driven(c_dt, ret=['voltages', 'fired', 'recovery'])
         times.append(net.time_ms)
         voltage_history.append(voltages)
         fired_history.append(fired)

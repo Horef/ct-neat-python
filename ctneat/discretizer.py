@@ -7,6 +7,8 @@ from sklearn.cluster import KMeans, DBSCAN
 from scipy.optimize import linear_sum_assignment
 from typing import Callable, Optional, Tuple, Union, List, Dict, Iterable, Collection
 from ctneat.iznn.dynamic_attractors import resample_data, dynamic_attractors_pipeline
+from sklearn.utils._testing import ignore_warnings
+from sklearn.exceptions import ConvergenceWarning
 
 class Discretizer:
     """
@@ -154,6 +156,7 @@ class Discretizer:
         if self.printouts:
             print("Network run complete. Attractor states recorded.")
 
+    @ignore_warnings(category=ConvergenceWarning)
     def cluster_attractors(self) -> Dict[int, int]:
         """
         Cluster the attractor states using either KMeans or DBSCAN.
@@ -172,9 +175,10 @@ class Discretizer:
         if self.force_cluster_num:
             if self.verbose:
                 print("Clustering attractors using KMeans...")
-            kmeans = KMeans(n_clusters=self.num_unique_outputs, random_state=self.random_state, verbose=int(self.verbose),
+            kmeans = KMeans(n_clusters=min(self.num_unique_outputs, len(attractor_states)), random_state=self.random_state, verbose=int(self.verbose),
                             **self.kmeans_args)
             cluster_labels = kmeans.fit_predict(attractor_states)
+            # if cluster
         else:
             if self.verbose:
                 print("Clustering attractors using DBSCAN...")
@@ -185,7 +189,14 @@ class Discretizer:
             print(f"Cluster labels assigned: {cluster_labels}")
 
         # map input index to cluster label
-        input_to_cluster = {i: cluster_labels[i] for i in range(len(self.inputs))}
+        input_to_cluster = {}
+        at_idx = 0
+        for i in range(len(self.inputs)):
+            if self.network_attractors[i] is not None:
+                input_to_cluster[i] = cluster_labels[at_idx]
+                at_idx += 1
+            else:
+                input_to_cluster[i] = -1  # indicate no attractor found
         return input_to_cluster
 
     def map_clusters_to_outputs(self, input_to_cluster: Dict[int, int]) -> Dict[int, Union[int, float]]:

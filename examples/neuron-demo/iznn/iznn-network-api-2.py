@@ -18,14 +18,14 @@ draw_ctrnn_net([-1, 0, 1, 2, 3], {1: node1_inputs, 2: node2_inputs, 3: node3_inp
 
 net = create_iznn_network(node_params={'bias': 0.0, **ctneat.iznn.RESONATOR_PARAMS},
                           node_inputs={1: node1_inputs, 2: node2_inputs, 3: node3_inputs},
-                          input_nodes=[-1, 0], output_nodes=[3])
+                          input_nodes=[-1, 0], output_nodes=[1,2,3], network_inputs=[3, 1])
 
-times, voltage_history, fired_history = simulate_iznn_network(net, time_steps=2000, dt_ms=0.05, ret=['voltages', 'fired'])
+times, voltage_history, fired_history = simulate_iznn_network(net, time_steps=100, steps_ms=True, dt_ms=0.05, ret=['voltages', 'fired'])
 
 
 draw_ctrnn_dynamics(voltage_history, uniform_time=True, iznn=True, save=True, show=False)
 
 draw_ctrnn_trajectory(voltage_history, n_components=2, iznn=True, save=True, show=False)
 
-dynamic_attractors_pipeline(voltage_history=voltage_history, fired_history=fired_history, times_np=times,
-                            variable_burn_in=True)
+# dynamic_attractors_pipeline(voltage_history=voltage_history, fired_history=fired_history, times_np=times,
+#                             variable_burn_in=True)

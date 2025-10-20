@@ -1,6 +1,12 @@
 What's New
 ==========
 
+What's new in ct-neat-python 1.1.1 (October 2025)
+-------------------------------------------------
+- Added an option to the Discretizer class to return the determinism value of the network's dynamics
+  when no attractor is found for a given input. This allows users to gain insights into the network's behavior
+  even when it does not settle into a stable state.
+
 What's new in ct-neat-python 1.1.0 (October 2025)
 -------------------------------------------------
 - Added a completely new module for discretization of continuous network dynamics. This module provides a Discretizer class which can be used to convert

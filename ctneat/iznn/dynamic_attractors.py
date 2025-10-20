@@ -1,4 +1,5 @@
-from typing import Optional, Union, Tuple, List
+from typing import Optional, Union, Tuple, List, Callable, Any
+
 from ctneat.iznn import IZNN
 from pyrqa.time_series import TimeSeries
 from pyrqa.settings import Settings
@@ -14,7 +15,205 @@ from sklearn.decomposition import PCA
 from scipy.signal import find_peaks
 from math import gcd
 from functools import reduce
+import matplotlib.pyplot as plt
 
+from sklearn.preprocessing import StandardScaler
+
+def find_optimal_radius_by_rr(time_series: TimeSeries, 
+                               similarity_measure,
+                               theiler_corrector: int,
+                               target_rr: float = 0.02, 
+                               tolerance: float = 1e-4, 
+                               max_iterations: int = 50) -> float:
+    """
+    Finds a coarse RQA radius by targeting a specific recurrence rate (RR).
+    Uses a binary search method to find the radius that yields the desired RR within a specified tolerance.
+
+    Args:
+        time_series (TimeSeries): The time series data for RQA.
+        similarity_measure: The similarity measure to use (e.g., EuclideanMetric) for the RQA.
+        theiler_corrector (int): The Theiler corrector value for the RQA.
+        target_rr (float): The target recurrence rate to achieve.
+        tolerance (float): The acceptable tolerance for the recurrence rate.
+        max_iterations (int): Maximum number of iterations for the search.
+    
+    Returns:
+        float: The radius that achieves the target recurrence rate within the specified tolerance.
+    """
+    def get_rr(radius: float) -> float:
+        """Helper function to compute RR for a given radius."""
+        settings = Settings(time_series, analysis_type=Classic,
+                            neighbourhood=FixedRadius(radius),
+                            similarity_measure=similarity_measure,
+                            theiler_corrector=theiler_corrector)
+        computation = RQAComputation.create(settings=settings)
+        result = computation.run()
+        return result.recurrence_rate
+
+    low_radius, high_radius = 1e-6, 1.0
+    while get_rr(high_radius) < target_rr:
+        high_radius *= 2.0
+        if high_radius > 100:
+             raise RuntimeError("Could not find a suitable upper radius bound for RR.")
+    
+    for _ in range(max_iterations):
+        mid_radius = (low_radius + high_radius) / 2
+        if mid_radius <= 0: return high_radius
+        current_rr = get_rr(mid_radius)
+        if abs(current_rr - target_rr) < tolerance:
+            return mid_radius
+        if current_rr < target_rr:
+            low_radius = mid_radius
+        else:
+            high_radius = mid_radius
+            
+    return (low_radius + high_radius) / 2
+
+def basic_feasibility_test(result: RQAResult, data_size: int) -> bool:
+    """
+    Checks whether the RQA result meets basic feasibility criteria for being periodic.
+
+    Args:
+        result (RQAResult): The RQA result to evaluate.
+        data_size (int): The size of the side of the RP matrix.
+    
+    Returns:
+        bool: True if the result meets the periodicity criteria, False otherwise.
+    """
+    lwvl = result.longest_white_vertical_line
+    ldl = result.longest_diagonal_line
+    return bool((lwvl < ldl) and (ldl > 0) and (lwvl > 0) and (lwvl + ldl < data_size))
+
+def perform_local_radius_search(start_radius: float, 
+                                fitness_function: Callable[[float], Tuple[float, RQAResult]],
+                                data_size: int,
+                                fitness_threshold: int = 10,
+                                search_steps: int = 50,
+                                initial_inc_factor: float = 0.1,
+                                min_radius: float = 1e-10,
+                                max_radius: float = 10.0) -> float:
+    """
+    Perform a local hill-climbing search to optimize the radius based on a provided fitness function.
+    """
+    c_radius = start_radius
+    c_inc = start_radius * initial_inc_factor
+    min_inc = 1e-10
+
+    best_fitness, best_result = fitness_function(c_radius)
+    best_radius = c_radius
+
+    for i in range(search_steps):
+        fit_up, res_up = fitness_function(min(max(c_radius + c_inc, min_radius), max_radius))
+        fit_down, res_down = fitness_function(min(max(c_radius - c_inc, min_radius), max_radius))
+
+        if (fit_up < fit_down) or (res_down.longest_white_vertical_line > res_down.longest_diagonal_line):
+            current_best_local_fit = fit_up
+            current_best_result = res_up
+        else:
+            current_best_local_fit = fit_down
+            current_best_result = res_down
+
+        if (current_best_local_fit < best_fitness) or not basic_feasibility_test(current_best_result, data_size):
+            best_fitness = current_best_local_fit
+            best_result = current_best_result
+                
+            c_radius = c_radius + c_inc if (current_best_local_fit == fit_up) else c_radius - c_inc
+            c_radius = min(max(c_radius, min_radius), max_radius)
+            best_radius = c_radius
+            if not basic_feasibility_test(current_best_result, data_size):
+                print(f" Step {i+1}: Not feasible yet. Moving to radius {c_radius:.6f} with fitness {best_fitness:.4f}")
+            else:
+                print(f" Step {i+1}: Improved fitness to {best_fitness:.4f} at radius {c_radius:.6f}")
+        else:
+            c_inc *= 0.5
+            print(f" Step {i+1}: No improvement. Reducing increment to {c_inc:.7f}")
+        
+        if c_inc < min_inc:
+            print(" Search converged (min increment reached).")
+            break
+
+        if (best_fitness < fitness_threshold) and basic_feasibility_test(best_result, data_size):
+            print(" Search converged (fitness threshold reached).")
+            break
+    
+    return best_radius
+
+def find_best_radius(data_points: np.ndarray,
+                     initial_target_rr: Optional[float] = None,
+                     fitness_threshold: int = 10,
+                     global_steps: int = 100,
+                     local_steps: int = 200,
+                     embedding_dim: int = 1,
+                     time_delay: int = 1,
+                     theiler_corrector: int = 1,
+                     metric: str = 'euclidean') -> float:
+    """
+    Find the best radius for RQA using a two-phase approach:
+    1. Global Search (RR): Finds a good starting point based on the lower bound on RR.
+    2. Local/Morphology Search (longest white + longest diagonal): Fine-tunes the radius for the specific visual pattern corresponding to periodicity.
+
+    Args:
+        data_points (np.ndarray): The data points to analyze.
+        initial_target_rr (Optional[float]): Initial target recurrence rate for global search.
+        global_steps (int): Number of steps for the global search phase.
+        local_steps (int): Number of steps for the local search phase.
+        embedding_dim (int): Embedding dimension for time series analysis.
+        time_delay (int): Time delay for time series analysis.
+        theiler_corrector (int): Theiler correction for time series analysis.
+        metric (str): Distance metric to use for similarity measurement.
+
+    Returns:
+        float: The best radius value.
+    """
+    if initial_target_rr is None:
+        initial_target_rr = 4/(data_points.shape[0]*np.sqrt(2))
+
+    # --- Universal Setup ---
+    scaler = StandardScaler()
+    data_normalized = scaler.fit_transform(data_points)
+    time_series = TimeSeries(data_normalized, embedding_dimension=embedding_dim, time_delay=time_delay)
+
+    metric_map = {'euclidean': EuclideanMetric, 'taxicab': TaxicabMetric, 'maximum': MaximumMetric}
+    if metric.lower() not in metric_map:
+        raise ValueError(f"Unsupported metric: {metric}")
+    similarity_measure = metric_map[metric.lower()]
+
+    # --- Phase 1: Global Search via Recurrence Rate ---
+    print("\n--- Starting Phase 1: Global Radius Search (Targeting RR) ---")
+    radius_p1 = find_optimal_radius_by_rr(time_series, similarity_measure=similarity_measure,
+                                          theiler_corrector=theiler_corrector, target_rr=initial_target_rr,
+                                          tolerance=1e-4, max_iterations=global_steps)
+    print(f"Phase 1 Complete. Coarse radius found: {radius_p1:.6f}\n")
+
+    # --- Phase 2: Local Search for Morphology (L_white/L_diag) ---
+    print("--- Starting Phase 2: Morphology Search (Fine-tuning L_white/L_diag) ---")
+    p2_history = []
+    def get_morphology_fitness(radius: float):
+        settings = Settings(time_series, analysis_type=Classic, neighbourhood=FixedRadius(radius),
+                            similarity_measure=similarity_measure, theiler_corrector=theiler_corrector)
+        result = RQAComputation.create(settings=settings).run()
+        fitness = abs(data_points.shape[0] - result.longest_white_vertical_line - result.longest_diagonal_line)
+        p2_history.append((radius, fitness, result.longest_white_vertical_line, result.longest_diagonal_line))
+        return fitness, result
+    
+    radius_p2 = perform_local_radius_search(radius_p1, fitness_function=get_morphology_fitness, data_size=data_points.shape[0],
+                                            fitness_threshold=fitness_threshold,
+                                            search_steps=local_steps, initial_inc_factor=0.05)
+    print(f"Phase 2 Complete. Final optimized radius: {radius_p2:.6f}\n")
+
+    # --- Plotting ---
+    # Plot Phase 2
+    radii, fitnesses, lwvl, ldl = zip(*sorted(p2_history))
+    plt.figure(figsize=(12, 7))
+    plt.plot(radii, fitnesses, 'o-', label='Fitness (abs difference)')
+    plt.plot(radii, lwvl, 'x--', label='Longest White Vertical Line')
+    plt.plot(radii, ldl, 's--', label='Longest Diagonal Line')
+    plt.axvline(radius_p1, color='g', linestyle=':', label='Start Radius (from RR)')
+    plt.axvline(radius_p2, color='r', linestyle='-', label='Final Best Radius')
+    plt.title('Phase 2: Morphology Fine-Tuning'); plt.xlabel('Radius'); plt.ylabel('Values'); plt.legend(); plt.grid(True)
+    plt.savefig('ctneat_outputs/radius_phase2_optimization.png'); plt.close()
+    
+    return radius_p2
 
 def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Optional[Union[float, str]] = None,
                   using_simulation: bool = False, net: Optional[IZNN] = None, events: bool = False, ret: str = 'voltages') -> Tuple[np.ndarray, np.ndarray]:
@@ -86,8 +285,8 @@ def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Opti
 
 
 def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, float]] = 0.25, 
-                         time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 2, 
-                         metric: str = 'euclidean', printouts: bool = False, verbose: bool = False) -> RQAResult:
+                         time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 1, 
+                         metric: str = 'euclidean', printouts: bool = False, verbose: bool = False, save_rp: bool = False) -> RQAResult:
     """
     Perform Recurrence Quantification Analysis (RQA) on the given data points.
 
@@ -110,6 +309,7 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
             or alternatively ('l2', 'l1' and 'linf'). Case insensitive. Default is 'euclidean'.
         printouts (bool): If True, prints summary information about the analysis.
         verbose (bool): If True, prints detailed information during the analysis. (If set to true, also enables printouts.)
+        save_rp (bool): If True, saves the recurrence plot as an image file named 'recurrence_plot.png'.
 
     Returns:
         None
@@ -143,24 +343,27 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
         radius = (0.2 * np.std(data_points)).item()
 
     time_series = TimeSeries(data_points,
-                            embedding_dimension=2*data_points.shape[1],
+                            embedding_dimension=1,
                             time_delay=time_delay)
     settings = Settings(time_series,
                         analysis_type=Classic,
                         neighbourhood=FixedRadius(radius=radius),
                         similarity_measure=similarity_measure,
                         theiler_corrector=theiler_corrector)
-    computation = RQAComputation.create(settings,
-                                        verbose=verbose)
+    computation = RQAComputation.create(settings=settings)
     result = computation.run()
     if verbose:
         print(result)
 
     # in addition, save the recurrence plot as an image
-    # computation = RPComputation.create(settings)
-    # rpc_result = computation.run()
-    # ImageGenerator.save_recurrence_plot(rpc_result.recurrence_matrix_reverse,
-    #                                     'recurrence_plot.png')
+    if save_rp:
+        computation = RPComputation.create(settings)
+        rpc_result = computation.run()
+        ImageGenerator.save_recurrence_plot(rpc_result.recurrence_matrix_reverse,
+                                            'ctneat_outputs/recurrence_plot.png')
+        if verbose:
+            print(f'Shape of the recurrence matrix: {rpc_result.recurrence_matrix_reverse.shape}\n'
+                  f'Size of the data_points used: {data_points.shape}')
     
     return result
 
@@ -269,7 +472,7 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
         if len(peaks) == 0:
             # If no significant peaks, characterize as flat
             neuron_fingerprints.append(f"N{i+1}(flat,v:{signal[-1]:.2f})")
-            neuronal_fingerprint_vecs.extend([0.0]*num_peaks)
+            neuronal_fingerprint_vecs.extend([0.0, 0.0]*num_peaks)
             neuronal_fingerprint_vecs.append(signal[-1])
             continue
 
@@ -294,7 +497,8 @@ def characterize_attractor_voltage(voltage_history_cycle: np.ndarray,
                 neuronal_fingerprint_vecs.extend([freq, mag])
             # If fewer than num_peaks were found, pad with zeros
             if len(peak_info) < num_peaks:
-                neuronal_fingerprint_vecs.extend([0.0] * (2 * (num_peaks - len(peak_info))))
+                neuronal_fingerprint_vecs.extend([0.0, 0.0] * (num_peaks - len(peak_info)))
+            neuronal_fingerprint_vecs.append(0.0) # last voltage value is 0.0 in non-flat case
 
     # CRUCIAL STEP: Sort the individual neuron fingerprints alphabetically.
     # This makes the final fingerprint invariant to the original neuron order.
@@ -481,8 +685,8 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
                                 using_simulation: bool = True, net: Optional[IZNN] = None,
                                 burn_in: Optional[Union[int, float]] = 0.25, variable_burn_in: bool = False,
                                 burn_in_rate: float = 0.5, min_repetitions: int = 3, min_points: int = 100,
-                                time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 2,
-                                det_threshold: float = 0.2, metric: str = 'euclidean',
+                                time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 5,
+                                det_threshold: float = 0.9, metric: str = 'euclidean',
                                 fingerprint_using: str = 'voltage', fingerprint_vec: bool = False,
                                 superimpose: bool = False, use_lcm: bool = True,
                                 flat_signal_threshold: float = 1e-3,

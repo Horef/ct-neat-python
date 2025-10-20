@@ -10,11 +10,19 @@ import inspect
 
 
 def sigmoid_activation(z):
+    """
+    A sigmoid activation function that clamps input to avoid overflow.
+    The slope of the sigmoid is made steeper to increase nonlinearity.
+    """
     z = max(-60.0, min(60.0, 5.0 * z))
     return 1.0 / (1.0 + math.exp(-z))
 
 
 def tanh_activation(z):
+    """
+    A hyperbolic tangent activation function that clamps input to avoid overflow.
+    The slope of the tanh is made steeper to increase nonlinearity.
+    """
     z = max(-60.0, min(60.0, 2.5 * z))
     return math.tanh(z)
 
