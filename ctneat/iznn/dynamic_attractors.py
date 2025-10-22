@@ -1,15 +1,8 @@
 from typing import Optional, Union, Tuple, List, Callable, Any
 
 from ctneat.iznn import IZNN
-from pyrqa.time_series import TimeSeries
-from pyrqa.settings import Settings
-from pyrqa.result import RQAResult
-from pyrqa.analysis_type import Classic
-from pyrqa.neighbourhood import FixedRadius
-from pyrqa.metric import EuclideanMetric, TaxicabMetric, MaximumMetric
-from pyrqa.computation import RQAComputation
-from pyrqa.computation import RPComputation
-from pyrqa.image_generator import ImageGenerator
+from ctneat.rqa.helper_functions import plot_recurrence_matrix, display_rqa_summary
+from pyunicorn.timeseries import RecurrencePlot
 import numpy as np
 from sklearn.decomposition import PCA
 from scipy.signal import find_peaks
@@ -19,36 +12,40 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import StandardScaler
 
-def find_optimal_radius_by_rr(time_series: TimeSeries, 
-                               similarity_measure,
-                               theiler_corrector: int,
-                               target_rr: float = 0.02, 
-                               tolerance: float = 1e-4, 
-                               max_iterations: int = 50) -> float:
+def find_optimal_radius_by_rr(data: np.ndarray, 
+                              similarity_measure: str = 'euclidean',
+                              normalize: bool = True,
+                              target_rr: float = 0.02, 
+                              abs_tolerance: Optional[float] = None,
+                              rel_tolerance: Optional[float] = 0.01, 
+                              max_iterations: int = 50) -> float:
     """
     Finds a coarse RQA radius by targeting a specific recurrence rate (RR).
     Uses a binary search method to find the radius that yields the desired RR within a specified tolerance.
 
     Args:
-        time_series (TimeSeries): The time series data for RQA.
+        data (np.ndarray): The data points to analyze.
         similarity_measure: The similarity measure to use (e.g., EuclideanMetric) for the RQA.
-        theiler_corrector (int): The Theiler corrector value for the RQA.
+        normalize (bool): Whether to normalize the data before analysis.
         target_rr (float): The target recurrence rate to achieve.
-        tolerance (float): The acceptable tolerance for the recurrence rate.
+        abs_tolerance (float): The acceptable absolute tolerance for the recurrence rate.
+        rel_tolerance (float): The acceptable relative tolerance for the recurrence rate. (Will be calculated as a fraction of target_rr)
+            Always used if abs_tolerance is not provided.
         max_iterations (int): Maximum number of iterations for the search.
     
     Returns:
         float: The radius that achieves the target recurrence rate within the specified tolerance.
     """
+    if abs_tolerance is None and rel_tolerance is None:
+        raise ValueError("Either abs_tolerance or rel_tolerance must be provided.")
+
     def get_rr(radius: float) -> float:
         """Helper function to compute RR for a given radius."""
-        settings = Settings(time_series, analysis_type=Classic,
-                            neighbourhood=FixedRadius(radius),
-                            similarity_measure=similarity_measure,
-                            theiler_corrector=theiler_corrector)
-        computation = RQAComputation.create(settings=settings)
-        result = computation.run()
-        return result.recurrence_rate
+        rp = RecurrencePlot(data, metric=similarity_measure, normalize=normalize, threshold=radius, silence_level=2)
+        rr = rp.recurrence_rate()
+        return rr
+
+    tolerance = abs_tolerance if abs_tolerance is not None else (rel_tolerance * target_rr)
 
     low_radius, high_radius = 1e-6, 1.0
     while get_rr(high_radius) < target_rr:
@@ -69,23 +66,23 @@ def find_optimal_radius_by_rr(time_series: TimeSeries,
             
     return (low_radius + high_radius) / 2
 
-def basic_feasibility_test(result: RQAResult, data_size: int) -> bool:
+def basic_feasibility_test(result: RecurrencePlot, data_size: int) -> bool:
     """
     Checks whether the RQA result meets basic feasibility criteria for being periodic.
 
     Args:
-        result (RQAResult): The RQA result to evaluate.
+        result (RecurrencePlot): The RQA result to evaluate.
         data_size (int): The size of the side of the RP matrix.
     
     Returns:
         bool: True if the result meets the periodicity criteria, False otherwise.
     """
-    lwvl = result.longest_white_vertical_line
-    ldl = result.longest_diagonal_line
+    lwvl = result.max_white_vertlength()
+    ldl = result.max_diaglength()
     return bool((lwvl < ldl) and (ldl > 0) and (lwvl > 0) and (lwvl + ldl < data_size))
 
 def perform_local_radius_search(start_radius: float, 
-                                fitness_function: Callable[[float], Tuple[float, RQAResult]],
+                                fitness_function: Callable[[float], Tuple[float, RecurrencePlot]],
                                 data_size: int,
                                 fitness_threshold: int = 10,
                                 search_steps: int = 50,
@@ -106,7 +103,7 @@ def perform_local_radius_search(start_radius: float,
         fit_up, res_up = fitness_function(min(max(c_radius + c_inc, min_radius), max_radius))
         fit_down, res_down = fitness_function(min(max(c_radius - c_inc, min_radius), max_radius))
 
-        if (fit_up < fit_down) or (res_down.longest_white_vertical_line > res_down.longest_diagonal_line):
+        if (fit_up < fit_down) or (res_down.max_white_vertlength() > res_down.max_diaglength()):
             current_best_local_fit = fit_up
             current_best_result = res_up
         else:
@@ -145,7 +142,7 @@ def find_best_radius(data_points: np.ndarray,
                      local_steps: int = 200,
                      embedding_dim: int = 1,
                      time_delay: int = 1,
-                     theiler_corrector: int = 1,
+                     normalize: bool = True,
                      metric: str = 'euclidean') -> float:
     """
     Find the best radius for RQA using a two-phase approach:
@@ -159,7 +156,7 @@ def find_best_radius(data_points: np.ndarray,
         local_steps (int): Number of steps for the local search phase.
         embedding_dim (int): Embedding dimension for time series analysis.
         time_delay (int): Time delay for time series analysis.
-        theiler_corrector (int): Theiler correction for time series analysis.
+        normalize (bool): Whether to normalize the data before analysis.
         metric (str): Distance metric to use for similarity measurement.
 
     Returns:
@@ -168,34 +165,22 @@ def find_best_radius(data_points: np.ndarray,
     if initial_target_rr is None:
         initial_target_rr = 4/(data_points.shape[0]*np.sqrt(2))
 
-    # --- Universal Setup ---
-    scaler = StandardScaler()
-    data_normalized = scaler.fit_transform(data_points)
-    time_series = TimeSeries(data_normalized, embedding_dimension=embedding_dim, time_delay=time_delay)
-
-    metric_map = {'euclidean': EuclideanMetric, 'taxicab': TaxicabMetric, 'maximum': MaximumMetric}
-    if metric.lower() not in metric_map:
-        raise ValueError(f"Unsupported metric: {metric}")
-    similarity_measure = metric_map[metric.lower()]
-
     # --- Phase 1: Global Search via Recurrence Rate ---
     print("\n--- Starting Phase 1: Global Radius Search (Targeting RR) ---")
-    radius_p1 = find_optimal_radius_by_rr(time_series, similarity_measure=similarity_measure,
-                                          theiler_corrector=theiler_corrector, target_rr=initial_target_rr,
-                                          tolerance=1e-4, max_iterations=global_steps)
+    radius_p1 = find_optimal_radius_by_rr(data=data_points, similarity_measure=metric,
+                                          target_rr=initial_target_rr, normalize=normalize,
+                                          rel_tolerance=0.01, max_iterations=global_steps)
     print(f"Phase 1 Complete. Coarse radius found: {radius_p1:.6f}\n")
 
     # --- Phase 2: Local Search for Morphology (L_white/L_diag) ---
     print("--- Starting Phase 2: Morphology Search (Fine-tuning L_white/L_diag) ---")
     p2_history = []
     def get_morphology_fitness(radius: float):
-        settings = Settings(time_series, analysis_type=Classic, neighbourhood=FixedRadius(radius),
-                            similarity_measure=similarity_measure, theiler_corrector=theiler_corrector)
-        result = RQAComputation.create(settings=settings).run()
-        fitness = abs(data_points.shape[0] - result.longest_white_vertical_line - result.longest_diagonal_line)
-        p2_history.append((radius, fitness, result.longest_white_vertical_line, result.longest_diagonal_line))
-        return fitness, result
-    
+        rp = RecurrencePlot(data_points, metric=metric, normalize=normalize, threshold=radius, silence_level=2)
+        fitness = abs(data_points.shape[0] - rp.max_white_vertlength() - rp.max_diaglength())
+        p2_history.append((radius, fitness, rp.max_white_vertlength(), rp.max_diaglength()))
+        return fitness, rp
+
     radius_p2 = perform_local_radius_search(radius_p1, fitness_function=get_morphology_fitness, data_size=data_points.shape[0],
                                             fitness_threshold=fitness_threshold,
                                             search_steps=local_steps, initial_inc_factor=0.05)
@@ -284,9 +269,9 @@ def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Opti
     return uniform_times, uniform_data
 
 
-def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, float]] = 0.25, 
+def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, float]] = 0.25, rescale: bool = True,
                          time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 1, 
-                         metric: str = 'euclidean', printouts: bool = False, verbose: bool = False, save_rp: bool = False) -> RQAResult:
+                         metric: str = 'euclidean', printouts: bool = False, verbose: bool = False, save_rp: bool = False) -> RecurrencePlot:
     """
     Perform Recurrence Quantification Analysis (RQA) on the given data points.
 
@@ -296,6 +281,7 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
         burn_in (Optional[Union[int, float]]): Number of initial time steps to discard from the analysis. 
             If float, treated as percentage. If int, treated as absolute number of steps. 
             If None, no burn-in is applied (same as if 0).
+        rescale (bool): If True, standardizes the data to have zero mean and unit variance.
         time_delay (int): Time delay for embedding the time series.
             The time delay defines the number of time steps to skip when creating the embedded vectors.
         radius (float): The radius for the recurrence plot. If None, a default value is 0.2 * std(data).
@@ -305,7 +291,7 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
             It excludes points within w time steps of each other from being considered recurrent pairs. 
             A small value (e.g., a few steps more than your time_delay) is usually sufficient to remove these trivial correlations. 
             Setting it to 0 disables it.
-        metric (str): The distance metric to use ('euclidean', 'taxicab', 'maximum') 
+        metric (str): The distance metric to use "manhattan", "euclidean", "supremum" 
             or alternatively ('l2', 'l1' and 'linf'). Case insensitive. Default is 'euclidean'.
         printouts (bool): If True, prints summary information about the analysis.
         verbose (bool): If True, prints detailed information during the analysis. (If set to true, also enables printouts.)
@@ -323,14 +309,14 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
 
     similarity_measure = None
     metric = metric.lower()
-    if metric not in ['euclidean', 'taxicab', 'maximum', 'l2', 'l1', 'linf']:
-        raise ValueError(f"Unsupported metric '{metric}'. Supported metrics are 'euclidean', 'taxicab', 'maximum' or alternatively 'l2', 'l1' and 'linf'.")
+    if metric not in ['euclidean', 'manhattan', 'supremum', 'l2', 'l1', 'linf']:
+        raise ValueError(f"Unsupported metric '{metric}'. Supported metrics are 'euclidean', 'manhattan', 'supremum' or alternatively 'l2', 'l1' and 'linf'.")
     if metric in ['euclidean', 'l2']:
-        similarity_measure = EuclideanMetric
-    elif metric in ['taxicab', 'l1']:
-        similarity_measure = TaxicabMetric
-    elif metric in ['maximum', 'linf']:
-        similarity_measure = MaximumMetric
+        similarity_measure = 'euclidean'
+    elif metric in ['manhattan', 'l1']:
+        similarity_measure = 'manhattan'
+    elif metric in ['supremum', 'linf']:
+        similarity_measure = 'supremum'
 
     if burn_in is not None:
         if isinstance(burn_in, float):
@@ -342,30 +328,18 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
     if radius is None:
         radius = (0.2 * np.std(data_points)).item()
 
-    time_series = TimeSeries(data_points,
-                            embedding_dimension=1,
-                            time_delay=time_delay)
-    settings = Settings(time_series,
-                        analysis_type=Classic,
-                        neighbourhood=FixedRadius(radius=radius),
-                        similarity_measure=similarity_measure,
-                        theiler_corrector=theiler_corrector)
-    computation = RQAComputation.create(settings=settings)
-    result = computation.run()
+    rp = RecurrencePlot(data_points, metric=similarity_measure, normalize=rescale, threshold=radius)
     if verbose:
-        print(result)
+        display_rqa_summary(rp)
 
     # in addition, save the recurrence plot as an image
     if save_rp:
-        computation = RPComputation.create(settings)
-        rpc_result = computation.run()
-        ImageGenerator.save_recurrence_plot(rpc_result.recurrence_matrix_reverse,
-                                            'ctneat_outputs/recurrence_plot.png')
-        if verbose:
-            print(f'Shape of the recurrence matrix: {rpc_result.recurrence_matrix_reverse.shape}\n'
-                  f'Size of the data_points used: {data_points.shape}')
-    
-    return result
+        plot_recurrence_matrix(recurrence_matrix=rp.recurrence_matrix(), 
+                               title=f"Recurrence Plot (radius={radius:.4f})", 
+                               save=True, show=False, 
+                               file_name="recurrence_plot")
+
+    return rp
 
 
 def characterize_attractor_spikes(fired_history: np.ndarray, t_start: int, t_end: int, return_vec: bool = False) -> Union[str, List[float]]:
@@ -809,12 +783,12 @@ def dynamic_attractors_pipeline(voltage_history: np.ndarray, fired_history: np.n
         rqa_result = perform_rqa_analysis(uniform_voltage_history, burn_in=burn_in, time_delay=time_delay, radius=radius,
                                         theiler_corrector=theiler_corrector, metric=metric, printouts=printouts, verbose=verbose)
         if initial_det is None:
-            initial_det = float(rqa_result.determinism)
+            initial_det = float(rqa_result.determinism())
         # If the determinism is above the threshold, it is likely there is an attractor, so we try to characterize it
-        if rqa_result.determinism > det_threshold:
+        if rqa_result.determinism() > det_threshold:
             # Fingerprint the attractor using the chosen method
             if printouts:
-                print(f"Significant determinism detected (DET={rqa_result.determinism:.3f}). Attempting to characterize attractors.")
+                print(f"Significant determinism detected (DET={rqa_result.determinism():.3f}). Attempting to characterize attractors.")
             fingerprint = fingerprint_attractors(uniform_voltage_history, uniform_fired_history, uniform_times, superimpose=superimpose,
                                                  use_lcm=use_lcm, fingerprint_using=fingerprint_using, fingerprint_vec=fingerprint_vec,
                                                  flat_signal_threshold=flat_signal_threshold,

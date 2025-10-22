@@ -12,6 +12,8 @@ from pyrqa.image_generator import ImageGenerator
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import bisect
+from scipy import signal
+from scipy.ndimage import gaussian_filter1d
 
 import ctneat
 from ctneat.api.iznn_api import create_iznn_network, simulate_iznn_network
@@ -19,8 +21,6 @@ from ctneat.ctrnn.ctrnn_visualize import draw_ctrnn_net, draw_ctrnn_dynamics, dr
 from ctneat.iznn.dynamic_attractors import dynamic_attractors_pipeline, resample_data, perform_rqa_analysis, find_best_radius
 
 from sklearn.preprocessing import StandardScaler
-
-
 
 
 def sin_test(radius: Optional[float] = None, sin_start: float = 0, sin_end: float = 10 * np.pi, num_points: int = 2000):
@@ -94,6 +94,35 @@ def best_peak_radius_test():
     print(f"Best radius for peaks: {radius}")
     peak_test(radius)
 
+def single_increase_test(radius: Optional[float] = None):
+    print("Running single increase test...")
+    data = np.zeros((2000, 3))
+    for i in range(data.shape[0]):
+        data[i, :] = i
+
+    # scaler = StandardScaler()
+    # data = scaler.fit_transform(data)
+    plt.plot(data)
+    plt.title("Single Increase")
+    plt.savefig("ctneat_outputs/single_increase.png")
+    plt.close()
+
+    radius = radius or 0.1
+
+    time_series = TimeSeries(data, embedding_dimension=1, time_delay=1)
+    settings = Settings(time_series,
+                        analysis_type=Classic,
+                        neighbourhood=FixedRadius(radius),
+                        similarity_measure=EuclideanMetric)
+    computation = RQAComputation.create(settings=settings)
+    result: RQAResult = computation.run()
+    print(result)
+
+    rp_computation = RPComputation.create(settings)
+    rp_result = rp_computation.run()
+    ImageGenerator.save_recurrence_plot(rp_result.recurrence_matrix_reverse, 'ctneat_outputs/single_increase_rp_euclidean.png')
+    print(f'The shape of the recurrence matrix is: {rp_result.recurrence_matrix_reverse.shape}')
+
 def noise_test(radius: Optional[float] = None, num_points: int = 2000):
     print("Running noise test...")
     noise = np.random.rand(num_points)
@@ -159,11 +188,11 @@ def iznn_net_test(radius: Optional[float] = None, burn_in: float = 0.25):
     node2_inputs = [(-1, 0.5), (0,-0.5), (1,-0.5), (2, 0.9)]
     node3_inputs = [(1, 0.4), (2, -0.4)]
 
-    net = create_iznn_network(node_params={'bias': 0.0, **ctneat.iznn.RESONATOR_PARAMS},
+    net = create_iznn_network(node_params={'bias': 0.0, **ctneat.iznn.REGULAR_SPIKING_PARAMS},
                           node_inputs={1: node1_inputs, 2: node2_inputs, 3: node3_inputs},
-                          input_nodes=[-1, 0], output_nodes=[1,2,3], network_inputs=[0, 0])
+                          input_nodes=[-1, 0], output_nodes=[1, 2, 3], network_inputs=[0, 0])
 
-    times, voltage_history, fired_history = simulate_iznn_network(net, time_steps=2000, dt_ms=0.05, ret=['voltages', 'fired'])
+    times, voltage_history, fired_history = simulate_iznn_network(net, time_steps=1000, dt_ms=0.05, ret=['voltages', 'fired'])
 
     if type(burn_in) is float:
         burn_in = int(burn_in * voltage_history.shape[0])
@@ -171,6 +200,8 @@ def iznn_net_test(radius: Optional[float] = None, burn_in: float = 0.25):
 
     scaler = StandardScaler()
     voltage_history = scaler.fit_transform(voltage_history)
+
+    print(voltage_history[:3, :])
 
     draw_ctrnn_dynamics(voltage_history, uniform_time=True, iznn=True, save=True, show=False)
 
@@ -185,7 +216,7 @@ def best_iznn_radius_test(burn_in: float = 0.15):
     node2_inputs = [(-1, 0.5), (0,-0.5), (1,-0.5), (2, 0.9)]
     node3_inputs = [(1, 0.4), (2, -0.4)]
 
-    net = create_iznn_network(node_params={'bias': 0.0, **ctneat.iznn.RESONATOR_PARAMS},
+    net = create_iznn_network(node_params={'bias': 0.0, **ctneat.iznn.REGULAR_SPIKING_PARAMS},
                           node_inputs={1: node1_inputs, 2: node2_inputs, 3: node3_inputs},
                           input_nodes=[-1, 0], output_nodes=[1,2,3], network_inputs=[0, 0])
 
@@ -207,5 +238,6 @@ if __name__ == '__main__':
     #noise_test()
     #peak_test()
     #flat_test()
-    #iznn_net_test(radius=0.000179, burn_in=0.5)
-    best_iznn_radius_test(burn_in=0.5)
+    single_increase_test()
+    #iznn_net_test(radius=5e-19, burn_in=0.5)
+    #best_iznn_radius_test(burn_in=0.5)
