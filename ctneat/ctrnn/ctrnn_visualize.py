@@ -8,6 +8,7 @@ import graphviz
 from sklearn.decomposition import PCA
 from typing import Optional, Union
 import warnings
+from sklearn.preprocessing import StandardScaler
 
 def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = False, dir_name: Optional[str] = 'ctneat_outputs', file_name: Optional[str] = None) -> None:
     """
@@ -36,7 +37,8 @@ def draw_ctrnn_net(node_list: list, node_inputs: dict, iznn: Optional[bool] = Fa
 
     dot.render(file_name or 'iznn_network' if iznn else 'ctrnn_network', format='png', cleanup=True, directory=dir_name or '.')
 
-def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Optional[Union[np.ndarray, list]] = None, 
+def draw_ctrnn_dynamics(states: np.ndarray, normalize: bool = False, uniform_time: bool = True, 
+                        times: Optional[Union[np.ndarray, list]] = None, 
                         iznn: Optional[bool] = False, save: bool = False, show: bool = True, 
                         dir_name: Optional[str] = 'ctneat_outputs', file_name: Optional[str] = None) -> None:
     """
@@ -45,6 +47,7 @@ def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Op
     Args:
         states: A 2D numpy array where each row corresponds to the state of the network at a given time step,
             and each column corresponds to a specific node's state.
+        normalize: Whether to normalize the states before plotting. If True, each node's state is scaled to [0, 1].
         uniform_time: Whether the time steps are uniform. If True, the function generates a uniform time array.
         times: If uniform_time is False, a list or numpy array of time points corresponding to each row in states.
             If uniform_time is True, this parameter is ignored.
@@ -62,6 +65,10 @@ def draw_ctrnn_dynamics(states: np.ndarray, uniform_time: bool = True, times: Op
     else:
         if times is None or len(times) != states.shape[0]:
             raise ValueError("Invalid times array. Must be provided and match the number of time steps in states.")
+
+    if normalize:
+        scaler = StandardScaler()
+        states = scaler.fit_transform(states)
 
     plt.figure()
     plt.title(f"{'IZNN' if iznn else 'CTRNN'} Dynamics")

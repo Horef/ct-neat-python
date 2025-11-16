@@ -5,6 +5,7 @@ import numpy as np
 from typing import Optional, Union, Tuple, List, Dict, Any
 from ctneat.iznn import IZNeuron, IZNN
 from ctneat.iznn.dynamic_attractors import resample_data
+from sklearn.preprocessing import StandardScaler
 
 def create_iznn_network(node_params: Union[Dict[int, Dict[str, Any]], Dict[str, Any]],
                         node_inputs: Dict[int, List[Tuple[int, float]]],
@@ -56,7 +57,7 @@ def create_iznn_network(node_params: Union[Dict[int, Dict[str, Any]], Dict[str, 
 
 def simulate_iznn_network(net: IZNN, time_steps: int, steps_ms: bool = False, dt_ms: float = 0.05,
                           ret: Union[str, List[str]] = 'voltages',
-                          uniform: bool = True) -> List[np.ndarray]:
+                          uniform: bool = True, normalize: bool = False) -> List[np.ndarray]:
     """
     Simulate the IZNN network for a given number of time steps and time step size.
 
@@ -76,6 +77,7 @@ def simulate_iznn_network(net: IZNN, time_steps: int, steps_ms: bool = False, dt
                     'recovery' - returns the recovery variables
                     'all' - returns a list of lists: [fired states, voltages, recovery variables]
         uniform: Whether to resample the output to uniform time steps. Default is True.
+        normalize: Whether to normalize the output voltages and recovery variables. Default is False.
     
     Returns:
         A list of lists as specified by the 'ret' parameter, representing
@@ -112,6 +114,11 @@ def simulate_iznn_network(net: IZNN, time_steps: int, steps_ms: bool = False, dt
         uniform_times, voltage_history = resample_data(times, voltage_history, dt_uniform_ms='min', using_simulation=True, net=net, events=False, ret='voltages')
         _, fired_history = resample_data(times, fired_history, dt_uniform_ms='min', using_simulation=True, net=net, events=False, ret='fired')
         _, recovery_history = resample_data(times, recovery_history, dt_uniform_ms='min', using_simulation=True, net=net, events=False, ret='recovery')
+
+    if normalize:
+        scaler = StandardScaler()
+        voltage_history = scaler.fit_transform(voltage_history)
+        recovery_history = scaler.fit_transform(recovery_history)
 
     ret_map = {
         'fired': fired_history,

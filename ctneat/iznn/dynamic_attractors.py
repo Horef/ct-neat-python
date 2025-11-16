@@ -9,8 +9,56 @@ from scipy.signal import find_peaks
 from math import gcd
 from functools import reduce
 import matplotlib.pyplot as plt
+from math import sqrt
 
-from sklearn.preprocessing import StandardScaler
+# garbage collection
+import gc
+# for warnings
+import warnings
+
+def cleanup_object(obj: Any):
+    """Helper function to delete an object and run garbage collection."""
+    del obj
+    gc.collect()
+
+def variable_burn_in(data: np.ndarray, threshold: Optional[float] = None, event: str = 'max', verbose: bool = False) -> int:
+    """
+    Finds the burn-in period for a given data based on either a threshold or first appearance of max/min event.
+
+    Args:
+        data (np.ndarray): The data array (time steps x neurons).
+        threshold (float): The threshold value to determine burn-in. If None, uses event-based method.
+        event (str): The event type to use if threshold is None. Options are 'max' or 'min'.
+        verbose (bool): If True, prints information about the burn-in detection process.
+    
+    Returns:
+        int: The burn-in time step index.
+    """
+    if threshold is not None:
+        for t in range(data.shape[0]):
+            if np.any(data[t, :] >= threshold):
+                if verbose:
+                    print(f"Burn-in detected at time step {t} out of {data.shape[0]} using threshold {threshold}.")
+                return t
+        return data.shape[0]  # If threshold never reached, return full length
+    else:
+        if event == 'max':
+            overall_max = np.max(data)
+            for t in range(data.shape[0]):
+                if np.any(data[t, :] == overall_max):
+                    if verbose:
+                        print(f"Burn-in detected at time step {t} out of {data.shape[0]} using event 'max'.")
+                    return t
+        elif event == 'min':
+            overall_min = np.min(data)
+            for t in range(data.shape[0]):
+                if np.any(data[t, :] == overall_min):
+                    if verbose:
+                        print(f"Burn-in detected at time step {t} out of {data.shape[0]} using event 'min'.")
+                    return t
+        else:
+            raise ValueError("Event must be either 'max' or 'min'.")
+        return data.shape[0]  # If event never found, return full length
 
 def find_optimal_radius_by_rr(data: np.ndarray, 
                               similarity_measure: str = 'euclidean',
@@ -27,6 +75,7 @@ def find_optimal_radius_by_rr(data: np.ndarray,
         data (np.ndarray): The data points to analyze.
         similarity_measure: The similarity measure to use (e.g., EuclideanMetric) for the RQA.
         normalize (bool): Whether to normalize the data before analysis.
+        quantize (Optional[np.floating]): If provided, quantizes the data to this precision before analysis.
         target_rr (float): The target recurrence rate to achieve.
         abs_tolerance (float): The acceptable absolute tolerance for the recurrence rate.
         rel_tolerance (float): The acceptable relative tolerance for the recurrence rate. (Will be calculated as a fraction of target_rr)
@@ -43,6 +92,7 @@ def find_optimal_radius_by_rr(data: np.ndarray,
         """Helper function to compute RR for a given radius."""
         rp = RecurrencePlot(data, metric=similarity_measure, normalize=normalize, threshold=radius, silence_level=2)
         rr = rp.recurrence_rate()
+        cleanup_object(rp)
         return rr
 
     tolerance = abs_tolerance if abs_tolerance is not None else (rel_tolerance * target_rr)
@@ -66,71 +116,90 @@ def find_optimal_radius_by_rr(data: np.ndarray,
             
     return (low_radius + high_radius) / 2
 
-def basic_feasibility_test(result: RecurrencePlot, data_size: int) -> bool:
+def basic_feasibility_test(data_size: int, result: Optional[RecurrencePlot] = None, 
+                           lwvl: Optional[float] = None, ldl: Optional[float] = None) -> bool:
     """
     Checks whether the RQA result meets basic feasibility criteria for being periodic.
 
     Args:
-        result (RecurrencePlot): The RQA result to evaluate.
         data_size (int): The size of the side of the RP matrix.
+        result (RecurrencePlot): The RQA result to evaluate.
+        lwvl (float): Longest white vertical line length. If provided, used instead of result.max_white_vertlength().
+        ldl (float): Longest diagonal line length. If provided, used instead of result.max_diaglength().
     
     Returns:
         bool: True if the result meets the periodicity criteria, False otherwise.
     """
-    lwvl = result.max_white_vertlength()
-    ldl = result.max_diaglength()
+    if result is None and (lwvl is None or ldl is None):
+        raise ValueError("Either result or both lwvl and ldl must be provided.")
+
+    lwvl = result.max_white_vertlength() if lwvl is None else lwvl
+    ldl = result.max_diaglength() if ldl is None else ldl
     return bool((lwvl < ldl) and (ldl > 0) and (lwvl > 0) and (lwvl + ldl < data_size))
 
 def perform_local_radius_search(start_radius: float, 
-                                fitness_function: Callable[[float], Tuple[float, RecurrencePlot]],
+                                fitness_function: Callable[[float], Tuple[float, float, float]],
                                 data_size: int,
                                 fitness_threshold: int = 10,
                                 search_steps: int = 50,
                                 initial_inc_factor: float = 0.1,
+                                inc_factor_multiplier: float = 0.5,
                                 min_radius: float = 1e-10,
-                                max_radius: float = 10.0) -> float:
+                                max_radius: float = 1,
+                                feasibility_step_multiplier: float = sqrt(2),
+                                max_inc_factor: float = 25.0) -> float:
     """
     Perform a local hill-climbing search to optimize the radius based on a provided fitness function.
     """
     c_radius = start_radius
     c_inc = start_radius * initial_inc_factor
     min_inc = 1e-10
+    max_inc = start_radius * max_inc_factor
 
-    best_fitness, best_result = fitness_function(c_radius)
+    best_fitness, best_lwvl, best_ldl = fitness_function(c_radius)
     best_radius = c_radius
 
     for i in range(search_steps):
-        fit_up, res_up = fitness_function(min(max(c_radius + c_inc, min_radius), max_radius))
-        fit_down, res_down = fitness_function(min(max(c_radius - c_inc, min_radius), max_radius))
+        fit_up, res_up_lwvl, res_up_ldl = fitness_function(min(max(c_radius + c_inc, min_radius), max_radius))
+        fit_down, res_down_lwvl, res_down_ldl = fitness_function(min(max(c_radius - c_inc, min_radius), max_radius))
 
-        if (fit_up < fit_down) or (res_down.max_white_vertlength() > res_down.max_diaglength()):
+        if (fit_up < fit_down) or (res_down_lwvl > res_down_ldl):
             current_best_local_fit = fit_up
-            current_best_result = res_up
+            current_best_result_lwvl = res_up_lwvl
+            current_best_result_ldl = res_up_ldl
         else:
             current_best_local_fit = fit_down
-            current_best_result = res_down
+            current_best_result_lwvl = res_down_lwvl
+            current_best_result_ldl = res_down_ldl
 
-        if (current_best_local_fit < best_fitness) or not basic_feasibility_test(current_best_result, data_size):
+        if (current_best_local_fit < best_fitness) or not basic_feasibility_test(data_size, lwvl=current_best_result_lwvl, ldl=current_best_result_ldl):
             best_fitness = current_best_local_fit
-            best_result = current_best_result
                 
             c_radius = c_radius + c_inc if (current_best_local_fit == fit_up) else c_radius - c_inc
             c_radius = min(max(c_radius, min_radius), max_radius)
             best_radius = c_radius
-            if not basic_feasibility_test(current_best_result, data_size):
-                print(f" Step {i+1}: Not feasible yet. Moving to radius {c_radius:.6f} with fitness {best_fitness:.4f}")
+            if not basic_feasibility_test(data_size, lwvl=current_best_result_lwvl, ldl=current_best_result_ldl):
+                print(f"Step {i+1}: Not feasible yet. Moving to radius {c_radius:.6f} with fitness {best_fitness:.4f}")
+                
+                if c_inc < max_inc:
+                    c_inc = min(c_inc * feasibility_step_multiplier, max_inc)
+                    print(f"             -> Accelerating increment to {c_inc:.7f}")
             else:
-                print(f" Step {i+1}: Improved fitness to {best_fitness:.4f} at radius {c_radius:.6f}")
+                print(f"Step {i+1}: Improved fitness to {best_fitness:.4f} at radius {c_radius:.6f}")
         else:
-            c_inc *= 0.5
-            print(f" Step {i+1}: No improvement. Reducing increment to {c_inc:.7f}")
+            c_inc *= max(inc_factor_multiplier * c_inc, min_inc)
+            print(f"Step {i+1}: No improvement. Reducing increment to {c_inc:.7f}")
         
         if c_inc < min_inc:
-            print(" Search converged (min increment reached).")
+            print("Search converged (min increment reached).")
             break
 
-        if (best_fitness < fitness_threshold) and basic_feasibility_test(best_result, data_size):
-            print(" Search converged (fitness threshold reached).")
+        if c_radius <= min_radius or c_radius >= max_radius:
+            print("Search converged (radius bounds reached).")
+            break
+
+        if (best_fitness < fitness_threshold) and basic_feasibility_test(data_size, lwvl=current_best_result_lwvl, ldl=current_best_result_ldl):
+            print("Search converged (fitness threshold reached).")
             break
     
     return best_radius
@@ -177,9 +246,12 @@ def find_best_radius(data_points: np.ndarray,
     p2_history = []
     def get_morphology_fitness(radius: float):
         rp = RecurrencePlot(data_points, metric=metric, normalize=normalize, threshold=radius, silence_level=2)
-        fitness = abs(data_points.shape[0] - rp.max_white_vertlength() - rp.max_diaglength())
-        p2_history.append((radius, fitness, rp.max_white_vertlength(), rp.max_diaglength()))
-        return fitness, rp
+        lwvl = rp.max_white_vertlength()
+        ldl = rp.max_diaglength()
+        cleanup_object(rp)
+        fitness = abs(data_points.shape[0] - lwvl - ldl)
+        p2_history.append((radius, fitness, lwvl, ldl))
+        return fitness, lwvl, ldl
 
     radius_p2 = perform_local_radius_search(radius_p1, fitness_function=get_morphology_fitness, data_size=data_points.shape[0],
                                             fitness_threshold=fitness_threshold,
@@ -270,7 +342,7 @@ def resample_data(times_np: np.ndarray, data_np: np.ndarray, dt_uniform_ms: Opti
 
 
 def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, float]] = 0.25, rescale: bool = True,
-                         time_delay: int = 1, radius: Optional[float] = None, theiler_corrector: int = 1, 
+                         time_delay: int = 1, radius: Optional[float] = None, 
                          metric: str = 'euclidean', printouts: bool = False, verbose: bool = False, save_rp: bool = False) -> RecurrencePlot:
     """
     Perform Recurrence Quantification Analysis (RQA) on the given data points.
@@ -286,11 +358,6 @@ def perform_rqa_analysis(data_points: np.ndarray, burn_in: Optional[Union[int, f
             The time delay defines the number of time steps to skip when creating the embedded vectors.
         radius (float): The radius for the recurrence plot. If None, a default value is 0.2 * std(data).
             The radius defines the threshold distance in state space for considering two states as recurrent.
-        theiler_corrector (int): Theiler window to exclude temporally close points.
-            This prevents finding "fake" recurrences from points that are close in distance simply because they are also close in time. 
-            It excludes points within w time steps of each other from being considered recurrent pairs. 
-            A small value (e.g., a few steps more than your time_delay) is usually sufficient to remove these trivial correlations. 
-            Setting it to 0 disables it.
         metric (str): The distance metric to use "manhattan", "euclidean", "supremum" 
             or alternatively ('l2', 'l1' and 'linf'). Case insensitive. Default is 'euclidean'.
         printouts (bool): If True, prints summary information about the analysis.
